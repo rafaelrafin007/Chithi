@@ -85,6 +85,13 @@ api.interceptors.response.use(
       return Promise.reject(error);
     }
 
+    const isRefreshRequest = (original.url || "").includes("/api/auth/token/refresh/");
+    if (isRefreshRequest) {
+      localStorage.removeItem("access");
+      localStorage.removeItem("refresh");
+      return Promise.reject(error);
+    }
+
     if (isRefreshing) {
       return new Promise((resolve, reject) => {
         refreshQueue.push({ resolve, reject });
@@ -99,9 +106,9 @@ api.interceptors.response.use(
     original._retry = true;
     isRefreshing = true;
     try {
-      const { data } = await api.post("/api/auth/token/refresh/", { refresh });
+      const { data } = await axios.post(`${apiBaseUrl}/api/auth/token/refresh/`, { refresh });
       localStorage.setItem("access", data.access);
-      api.defaults.headers.Authorization = `Bearer ${data.access}`;
+      api.defaults.headers.common.Authorization = `Bearer ${data.access}`;
       resolveQueue(null, data.access);
       return api(original);
     } catch (err) {

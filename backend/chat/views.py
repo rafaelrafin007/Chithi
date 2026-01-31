@@ -1,9 +1,10 @@
 from django.contrib.auth import get_user_model
 from django.db.models import Q
-from rest_framework import generics, status
+from rest_framework import generics, status, permissions
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.parsers import MultiPartParser, FormParser
+from django.core.signing import TimestampSigner
 
 from .models import Message
 from .serializers import UserLiteSerializer, MessageSerializer
@@ -101,3 +102,12 @@ class SendMessageView(APIView):
             logging.exception("Failed to broadcast chat message to channel layer")
 
         return Response(serialized, status=status.HTTP_201_CREATED)
+
+
+class WSTokenView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        signer = TimestampSigner(salt="ws-token")
+        token = signer.sign(str(request.user.id))
+        return Response({"ws_token": token})

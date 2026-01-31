@@ -220,11 +220,23 @@ class ChatConsumer(AsyncJsonWebsocketConsumer):
     # ----------------- helpers (lazy imports) -----------------
     async def _authenticate_from_querystring(self):
         try:
+            # Prefer short-lived WS token over JWT in querystring.
+            from django.core.signing import TimestampSigner, BadSignature, SignatureExpired
+            signer = TimestampSigner(salt="ws-token")
+
             from rest_framework_simplejwt.backends import TokenBackend
             from rest_framework_simplejwt.exceptions import TokenError, InvalidToken
             from django.conf import settings
 
             query = parse_qs(self.scope.get("query_string", b"").decode())
+            ws_token = (query.get("ws_token") or [None])[0]
+            if ws_token:
+                try:
+                    user_id = signer.unsign(ws_token, max_age=60)
+                    return await self._get_user(user_id)
+                except (BadSignature, SignatureExpired):
+                    return None
+
             token = (query.get("token") or [None])[0]
             if not token:
                 return None

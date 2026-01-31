@@ -237,24 +237,31 @@ export default function useChat(user) {
     const token = localStorage.getItem("access");
     if (!token) return;
 
-    const apiBase = getApiBaseUrl();
-    const wsScheme = apiBase.startsWith("https://") ? "wss" : "ws";
-    const wsHost = apiBase.replace(/^https?:\/\//, "");
-    const url = `${wsScheme}://${wsHost}/ws/chat/${selected.id}/?token=${token}`;
-
-    const ws = new WebSocket(url);
-    wsRef.current = ws;
-
-    ws.onopen = () => {
-      if (messages.length) {
-        const lastTs = messages[messages.length - 1].timestamp;
-        sendWhenWsReady({ type: "read", last_read: lastTs });
-      }
-    };
-
-    ws.onmessage = (evt) => {
+    let cancelled = false;
+    const connect = async () => {
       try {
-        const payload = JSON.parse(evt.data);
+        const resp = await api.get("/api/chat/ws-token/");
+        const wsToken = resp.data?.ws_token;
+        if (!wsToken || cancelled) return;
+
+        const apiBase = getApiBaseUrl();
+        const wsScheme = apiBase.startsWith("https://") ? "wss" : "ws";
+        const wsHost = apiBase.replace(/^https?:\/\//, "");
+        const url = `${wsScheme}://${wsHost}/ws/chat/${selected.id}/?ws_token=${encodeURIComponent(wsToken)}`;
+
+        const ws = new WebSocket(url);
+        wsRef.current = ws;
+
+        ws.onopen = () => {
+          if (messages.length) {
+            const lastTs = messages[messages.length - 1].timestamp;
+            sendWhenWsReady({ type: "read", last_read: lastTs });
+          }
+        };
+
+        ws.onmessage = (evt) => {
+          try {
+            const payload = JSON.parse(evt.data);
 
         if (payload?.type === "typing") {
           const typingUserId = payload.user;
@@ -404,15 +411,22 @@ export default function useChat(user) {
           );
           return;
         }
-      } catch (e) {
-        console.error("WS parse error:", e);
+          } catch (e) {
+            console.error("WS parse error:", e);
+          }
+        };
+
+        ws.onclose = () => {};
+        ws.onerror = (e) => console.error("WS error:", e);
+      } catch (err) {
+        console.error("Failed to fetch WS token:", err);
       }
     };
 
-    ws.onclose = () => {};
-    ws.onerror = (e) => console.error("WS error:", e);
+    connect();
 
     return () => {
+      cancelled = true;
       clearTimeout(typingTimeoutRef.current);
       try {
         ws.close();
