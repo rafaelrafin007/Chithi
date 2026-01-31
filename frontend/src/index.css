@@ -800,6 +800,7 @@ body.light-theme .profile-panel-backdrop {
 .icon-btn{background:transparent;border:0;padding:6px;border-radius:6px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center}
 .icon-btn:hover{background:var(--panel-bg)}
 .edit-icon{font-size:14px}
+body.dark-theme .edit-icon{color:#fff;}
 
 /* Editor layouts */
 .editor-row{display:flex;gap:8px;align-items:flex-start}
