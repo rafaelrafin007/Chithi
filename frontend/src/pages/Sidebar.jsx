@@ -3,7 +3,7 @@ import React, { useState } from "react";
 import { useAuth } from "../context/AuthContext";
 import ProfilePanel from "../pages/ProfilePanel";
 
-export default function Sidebar({ users, selected, setSelected, theme, toggleTheme }) {
+export default function Sidebar({ users, selected, setSelected, theme, toggleTheme, width }) {
   const { user } = useAuth();
   const [showProfile, setShowProfile] = useState(false);
 
@@ -18,7 +18,7 @@ export default function Sidebar({ users, selected, setSelected, theme, toggleThe
   const initials = (str) => (str ? str[0].toUpperCase() : "U");
 
   return (
-    <div className="chat-sidebar">
+    <div className="chat-sidebar" style={{ width }}>
       <div className="chat-sidebar-header" style={{ display: "flex", alignItems: "center", gap: 10 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           {/* Avatar button for current logged-in user */}
@@ -73,8 +73,12 @@ export default function Sidebar({ users, selected, setSelected, theme, toggleThe
         </label>
       </div>
 
-      {/* Profile panel (collapsible) */}
-      {showProfile && <ProfilePanel onClose={() => setShowProfile(false)} />}
+      {/* Profile panel (overlay) */}
+      {showProfile && (
+        <div className="profile-panel-overlay">
+          <ProfilePanel onClose={() => setShowProfile(false)} />
+        </div>
+      )}
 
       {/* Users list */}
       {users.map((u) => {

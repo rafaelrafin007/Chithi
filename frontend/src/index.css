@@ -35,10 +35,26 @@ body.dark-theme {
 /* Sidebar */
 .chat-sidebar {
   width: 270px;
+  flex: 0 0 auto;
   padding: 15px;
   overflow-y: auto;
   box-shadow: 2px 0 8px rgba(0, 0, 0, 0.05);
   border-right: 1px solid;
+  position: relative;
+}
+
+.sidebar-resizer {
+  width: 6px;
+  cursor: col-resize;
+  background: transparent;
+}
+
+.sidebar-resizer:hover {
+  background: rgba(0, 0, 0, 0.08);
+}
+
+body.dark-theme .sidebar-resizer:hover {
+  background: rgba(255, 255, 255, 0.08);
 }
 
 body.light-theme .chat-sidebar {
@@ -733,6 +749,22 @@ body.dark-theme{
   background:transparent;
   font-family:inherit;
   font-size:14px;
+}
+
+.profile-panel-overlay {
+  position: absolute;
+  top: 64px;
+  left: 10px;
+  right: 10px;
+  z-index: 10;
+  border-radius: 12px;
+  background: rgba(20, 20, 22, 0.92);
+  border: 1px solid var(--border);
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.35);
+}
+
+body.light-theme .profile-panel-overlay {
+  background: rgba(255, 255, 255, 0.9);
 }
 
 /* Header: avatar + meta */

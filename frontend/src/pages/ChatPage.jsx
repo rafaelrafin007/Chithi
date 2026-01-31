@@ -1,5 +1,5 @@
 // src/pages/chatpage.jsx
-import React from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { useAuth } from "../context/AuthContext";
 import Sidebar from "./Sidebar";
 import MessageBubble from "./MessageBubble";
@@ -8,6 +8,8 @@ import useChat from "../hooks/useChat";
 export default function ChatPage() {
   const { user } = useAuth();
   const chat = useChat(user);
+  const [sidebarWidth, setSidebarWidth] = useState(280);
+  const isResizingRef = useRef(false);
 
   const fileLabel = (file, url) => {
     if (!file && !url) return "attachment";
@@ -26,6 +28,25 @@ export default function ChatPage() {
 
   const selected = chat.selected;
 
+  useEffect(() => {
+    const handleMove = (e) => {
+      if (!isResizingRef.current) return;
+      const min = 220;
+      const max = 420;
+      const next = Math.max(min, Math.min(max, e.clientX));
+      setSidebarWidth(next);
+    };
+    const handleUp = () => {
+      isResizingRef.current = false;
+    };
+    window.addEventListener("mousemove", handleMove);
+    window.addEventListener("mouseup", handleUp);
+    return () => {
+      window.removeEventListener("mousemove", handleMove);
+      window.removeEventListener("mouseup", handleUp);
+    };
+  }, []);
+
   return (
     <div className="chat-container">
       {/* Sidebar */}
@@ -35,6 +56,14 @@ export default function ChatPage() {
         setSelected={chat.setSelected}
         theme={chat.theme}
         toggleTheme={chat.toggleTheme}
+        width={sidebarWidth}
+      />
+
+      <div
+        className="sidebar-resizer"
+        onMouseDown={() => {
+          isResizingRef.current = true;
+        }}
       />
 
       {/* Chat Window */}
