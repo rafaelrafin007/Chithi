@@ -75,8 +75,10 @@ export default function Sidebar({ users, selected, setSelected, theme, toggleThe
 
       {/* Profile panel (overlay) */}
       {showProfile && (
-        <div className="profile-panel-overlay">
-          <ProfilePanel onClose={() => setShowProfile(false)} />
+        <div className="profile-panel-backdrop" onClick={() => setShowProfile(false)}>
+          <div className="profile-panel-overlay" onClick={(e) => e.stopPropagation()}>
+            <ProfilePanel onClose={() => setShowProfile(false)} />
+          </div>
         </div>
       )}
 
