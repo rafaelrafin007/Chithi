@@ -29,7 +29,7 @@ export default function Login() {
     <div>
       <div className="welcome-container">
         <h1 className="welcome-title">Welcome to Chithi</h1>
-        <p className="welcome-tagline">Your digital letter 💌</p>
+        <p className="welcome-tagline">Your digital letter</p>
       </div>
 
       <div style={{ maxWidth: 360, margin: "32px auto", textAlign: "center", fontSize: 20 }}>
@@ -52,7 +52,7 @@ export default function Login() {
             autoComplete="current-password"
           />
           <button type="submit" disabled={loading}>
-            {loading ? "Signing in…" : "Sign in"}
+            {loading ? "Signing in..." : "Sign in"}
           </button>
         </form>
         <p style={{ marginTop: 8 }}>

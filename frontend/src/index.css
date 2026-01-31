@@ -242,7 +242,7 @@ body.dark-theme {
   --menu-item-hover-bg: rgba(255,255,255,0.08);
 }
 
-/* 🌟 Upgraded Menu button */
+/* Upgraded menu button */
 .message-menu-btn {
   position: absolute;
   top: 6px;
@@ -785,4 +785,3 @@ body.dark-theme{
   .editor-row{flex-direction:column}
   .editor-actions{flex-direction:row;min-width:auto}
 }
-

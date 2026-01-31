@@ -73,7 +73,9 @@ export default function ChatPage() {
                 <h3 style={{ margin: 0 }}>{getDisplayName(selected)}</h3>
                 {selected?.last_message?.sender && (
                   <small style={{ opacity: 0.7 }}>
-                    {selected.last_message.sender?.id === user?.id ? "You" : (selected.last_message.sender?.display_name || selected.last_message.sender?.username)}
+                    {selected.last_message.sender?.id === user?.id
+                      ? "You"
+                      : selected.last_message.sender?.display_name || selected.last_message.sender?.username}
                   </small>
                 )}
               </div>
@@ -107,7 +109,7 @@ export default function ChatPage() {
 
           {chat.typing && chat.selected && (
             <div className="typing-indicator">
-              {(chat.selected?.display_name || chat.selected?.profile?.display_name || chat.selected?.username)} is typing…
+              {(chat.selected?.display_name || chat.selected?.profile?.display_name || chat.selected?.username)} is typing...
             </div>
           )}
 
@@ -123,7 +125,7 @@ export default function ChatPage() {
                   <img src={chat.previewUrl} alt={chat.selectedFile.name} className="preview-image" />
                 ) : (
                   <div className="file-info">
-                    <span>🖼️</span>
+                    <span>Image</span>
                     <span className="file-name">{chat.selectedFile?.name}</span>
                   </div>
                 )
@@ -147,7 +149,7 @@ export default function ChatPage() {
 
               <div className="remove-btn-wrap">
                 <button type="button" onClick={chat.removeAttachment} className="remove-btn" title="Remove attachment">
-                  ✕
+                  x
                 </button>
               </div>
             </div>
@@ -156,12 +158,17 @@ export default function ChatPage() {
           <div className="chat-input-row">
             <input type="file" id="chat-attach-input" className="hidden-input" onChange={chat.handleFileChange} />
 
-            <button type="button" onClick={() => document.getElementById("chat-attach-input")?.click()} title="Attach a file" className="attach-btn">
+            <button
+              type="button"
+              onClick={() => document.getElementById("chat-attach-input")?.click()}
+              title="Attach a file"
+              className="attach-btn"
+            >
               +
             </button>
 
             <input
-              placeholder="Type a message…"
+              placeholder="Type a message..."
               value={chat.text}
               onChange={chat.handleTyping}
               onKeyDown={(e) => e.key === "Enter" && chat.send()}

@@ -11,8 +11,7 @@ export default function Sidebar({ users, selected, setSelected, theme, toggleThe
   const displayName = user?.display_name || user?.profile?.display_name || user?.username;
 
   // helper to get display name for any user object `u`
-  const getDisplayName = (u) =>
-    u?.display_name || u?.profile?.display_name || u?.username || "Unknown";
+  const getDisplayName = (u) => u?.display_name || u?.profile?.display_name || u?.username || "Unknown";
 
   const getAvatar = (u) => u?.avatar_url || u?.profile?.avatar_url || null;
 
@@ -119,15 +118,23 @@ export default function Sidebar({ users, selected, setSelected, theme, toggleThe
             {/* Text area */}
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <span className={u.unread > 0 ? "bold-username" : ""} style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                <span
+                  className={u.unread > 0 ? "bold-username" : ""}
+                  style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
+                >
                   {name}
                 </span>
                 {u.unread > 0 && <span className="unread-badge">{u.unread}</span>}
               </div>
 
               {u.last_message?.content && (
-                <small className={`last-msg ${u.unread > 0 ? "bold-username" : ""}`} style={{ display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                  {u.last_message.content.length > 40 ? u.last_message.content.slice(0, 40) + "…" : u.last_message.content}
+                <small
+                  className={`last-msg ${u.unread > 0 ? "bold-username" : ""}`}
+                  style={{ display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
+                >
+                  {u.last_message.content.length > 40
+                    ? u.last_message.content.slice(0, 40) + "..."
+                    : u.last_message.content}
                 </small>
               )}
             </div>

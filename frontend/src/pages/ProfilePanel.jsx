@@ -37,7 +37,7 @@ export default function ProfilePanel({ onClose }) {
     setAvatarPreview(profile.avatar_url || null);
     // clear avatarFile when profile changes from server
     setAvatarFile(null);
-  }, [user]);
+  }, [user, profile.about, profile.display_name, profile.phone, profile.avatar_url]);
 
   // Avatar handlers
   const handleAvatarChange = (e) => {
@@ -45,7 +45,9 @@ export default function ProfilePanel({ onClose }) {
     if (!f) return;
     // revoke previous object url if any
     if (avatarPreview && avatarPreview.startsWith("blob:")) {
-      try { URL.revokeObjectURL(avatarPreview); } catch {}
+      try {
+        URL.revokeObjectURL(avatarPreview);
+      } catch {}
     }
     setAvatarFile(f);
     setAvatarPreview(URL.createObjectURL(f));
@@ -55,7 +57,9 @@ export default function ProfilePanel({ onClose }) {
 
   const cancelAvatarSelection = () => {
     if (avatarPreview && avatarPreview.startsWith("blob:")) {
-      try { URL.revokeObjectURL(avatarPreview); } catch {}
+      try {
+        URL.revokeObjectURL(avatarPreview);
+      } catch {}
     }
     setAvatarFile(null);
     setAvatarPreview(profile.avatar_url || null);
@@ -172,20 +176,20 @@ export default function ProfilePanel({ onClose }) {
               placeholder="Your name"
             />
             <div className="editor-actions">
-              <button
-                className="btn btn-primary"
-                onClick={() => saveField("name")}
-                disabled={loadingField === "name"}
-              >
-                {loadingField === "name" ? "Saving…" : "Save"}
+              <button className="btn btn-primary" onClick={() => saveField("name")} disabled={loadingField === "name"}>
+                {loadingField === "name" ? "Saving..." : "Save"}
               </button>
-              <button className="btn btn-secondary" onClick={() => cancelEdit("name")}>Cancel</button>
+              <button className="btn btn-secondary" onClick={() => cancelEdit("name")}>
+                Cancel
+              </button>
             </div>
           </div>
         ) : (
           <div className="field-value-row">
             <div className="field-value">{displayName || <span className="field-empty">No name set</span>}</div>
-            <button className="icon-btn edit-icon" onClick={() => setEditing("name")} title="Edit name">✏️</button>
+            <button className="icon-btn edit-icon" onClick={() => setEditing("name")} title="Edit name">
+              Edit
+            </button>
           </div>
         )}
         {errorField && editing === "name" && <div className="error-text">{errorField}</div>}
@@ -208,15 +212,19 @@ export default function ProfilePanel({ onClose }) {
                 onClick={() => saveField("about")}
                 disabled={loadingField === "about"}
               >
-                {loadingField === "about" ? "Saving…" : "Save"}
+                {loadingField === "about" ? "Saving..." : "Save"}
               </button>
-              <button className="btn btn-secondary" onClick={() => cancelEdit("about")}>Cancel</button>
+              <button className="btn btn-secondary" onClick={() => cancelEdit("about")}>
+                Cancel
+              </button>
             </div>
           </div>
         ) : (
           <div className="field-value-row">
             <div className="field-value">{about || <span className="field-empty">No about set</span>}</div>
-            <button className="icon-btn edit-icon" onClick={() => setEditing("about")} title="Edit about">✏️</button>
+            <button className="icon-btn edit-icon" onClick={() => setEditing("about")} title="Edit about">
+              Edit
+            </button>
           </div>
         )}
         {errorField && editing === "about" && <div className="error-text">{errorField}</div>}
@@ -239,15 +247,19 @@ export default function ProfilePanel({ onClose }) {
                 onClick={() => saveField("phone")}
                 disabled={loadingField === "phone"}
               >
-                {loadingField === "phone" ? "Saving…" : "Save"}
+                {loadingField === "phone" ? "Saving..." : "Save"}
               </button>
-              <button className="btn btn-secondary" onClick={() => cancelEdit("phone")}>Cancel</button>
+              <button className="btn btn-secondary" onClick={() => cancelEdit("phone")}>
+                Cancel
+              </button>
             </div>
           </div>
         ) : (
           <div className="field-value-row">
             <div className="field-value">{phone || <span className="field-empty">No phone set</span>}</div>
-            <button className="icon-btn edit-icon" onClick={() => setEditing("phone")} title="Edit phone">✏️</button>
+            <button className="icon-btn edit-icon" onClick={() => setEditing("phone")} title="Edit phone">
+              Edit
+            </button>
           </div>
         )}
         {errorField && editing === "phone" && <div className="error-text">{errorField}</div>}
@@ -262,9 +274,11 @@ export default function ProfilePanel({ onClose }) {
               onClick={() => saveField("avatar")}
               disabled={loadingField === "avatar"}
             >
-              {loadingField === "avatar" ? "Saving…" : "Save avatar"}
+              {loadingField === "avatar" ? "Saving..." : "Save avatar"}
             </button>
-            <button className="btn btn-secondary" onClick={() => cancelEdit("avatar")}>Cancel</button>
+            <button className="btn btn-secondary" onClick={() => cancelEdit("avatar")}>
+              Cancel
+            </button>
           </div>
           {errorField && <div className="error-text">{errorField}</div>}
         </div>
@@ -273,7 +287,9 @@ export default function ProfilePanel({ onClose }) {
       {/* close button at bottom (optional) */}
       <div className="profile-close-row">
         {onClose && (
-          <button className="btn btn-secondary" onClick={onClose}>Close</button>
+          <button className="btn btn-secondary" onClick={onClose}>
+            Close
+          </button>
         )}
       </div>
     </div>

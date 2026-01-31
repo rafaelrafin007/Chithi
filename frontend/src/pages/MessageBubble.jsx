@@ -37,35 +37,48 @@ export default function MessageBubble({
   const showAttachment = !!attachmentUrl && !m.is_deleted;
 
   const renderFileCard = () => (
-    <div className="file-card" style={{
-      display: "flex",
-      gap: 10,
-      alignItems: "center",
-      padding: "8px 10px",
-      borderRadius: 8,
-      border: "1px solid rgba(255,255,255,0.04)",
-      maxWidth: 320,
-      background: "rgba(0,0,0,0.03)"
-    }}>
-      <div className="file-icon" style={{
-        minWidth: 44,
-        minHeight: 44,
+    <div
+      className="file-card"
+      style={{
         display: "flex",
+        gap: 10,
         alignItems: "center",
-        justifyContent: "center",
-        borderRadius: 6,
-        background: "rgba(255,255,255,0.02)",
-        fontWeight: 700
-      }}>
+        padding: "8px 10px",
+        borderRadius: 8,
+        border: "1px solid rgba(255,255,255,0.04)",
+        maxWidth: 320,
+        background: "rgba(0,0,0,0.03)",
+      }}
+    >
+      <div
+        className="file-icon"
+        style={{
+          minWidth: 44,
+          minHeight: 44,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          borderRadius: 6,
+          background: "rgba(255,255,255,0.02)",
+          fontWeight: 700,
+        }}
+      >
         {ext === "pdf" ? "PDF" : ext ? ext.toUpperCase() : "FILE"}
       </div>
       <div className="file-meta" style={{ overflow: "hidden" }}>
-        <a href={attachmentUrl} target="_blank" rel="noreferrer" style={{
-          display: "block",
-          whiteSpace: "nowrap",
-          overflow: "hidden",
-          textOverflow: "ellipsis",
-        }}>{attachmentName || "download"}</a>
+        <a
+          href={attachmentUrl}
+          target="_blank"
+          rel="noreferrer"
+          style={{
+            display: "block",
+            whiteSpace: "nowrap",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+          }}
+        >
+          {attachmentName || "download"}
+        </a>
         {/* you could show size if serializer provides it */}
       </div>
     </div>
@@ -83,8 +96,12 @@ export default function MessageBubble({
               placeholder="Edit message..."
             />
             <div className="edit-actions">
-              <button className="btn btn-primary" onClick={submitEdit}>Save</button>
-              <button className="btn btn-secondary" onClick={cancelEdit}>Cancel</button>
+              <button className="btn btn-primary" onClick={submitEdit}>
+                Save
+              </button>
+              <button className="btn btn-secondary" onClick={cancelEdit}>
+                Cancel
+              </button>
             </div>
           </div>
         ) : (
@@ -92,9 +109,7 @@ export default function MessageBubble({
             {/* Message content */}
             <p className="message-content">
               {m.content}
-              {m.is_edited && !m.is_deleted && (
-                <em className="edited-tag">(edited)</em>
-              )}
+              {m.is_edited && !m.is_deleted && <em className="edited-tag">(edited)</em>}
             </p>
 
             {/* Attachment preview (image or file link/card) */}
@@ -109,31 +124,24 @@ export default function MessageBubble({
                       style={{ maxWidth: 280, borderRadius: 8, display: "block" }}
                     />
                   </a>
+                ) : attachmentUrl && attachmentUrl.match(/\.(jpg|jpeg|png|gif|webp|bmp)$/i) ? (
+                  <a href={attachmentUrl} target="_blank" rel="noreferrer">
+                    <img
+                      src={attachmentUrl}
+                      alt="attachment"
+                      style={{ maxWidth: 280, borderRadius: 8, display: "block" }}
+                    />
+                  </a>
                 ) : (
-                  // No thumb: if extension looks like an image, show the image itself
-                  (attachmentUrl && attachmentUrl.match(/\.(jpg|jpeg|png|gif|webp|bmp)$/i)) ? (
-                    <a href={attachmentUrl} target="_blank" rel="noreferrer">
-                      <img
-                        src={attachmentUrl}
-                        alt="attachment"
-                        style={{ maxWidth: 280, borderRadius: 8, display: "block" }}
-                      />
-                    </a>
-                  ) : (
-                    // Generic file card (PDF or other)
-                    renderFileCard()
-                  )
+                  // Generic file card (PDF or other)
+                  renderFileCard()
                 )}
               </div>
             )}
 
             <span className="chat-timestamp">
               {formatTimestamp(m.timestamp)}
-              {mine && (
-                <span className="read-receipt">
-                  {m.read ? "✓✓" : m.delivered ? "✓✓" : "✓"}
-                </span>
-              )}
+              {mine && <span className="read-receipt">{m.read ? "read" : m.delivered ? "delivered" : "sent"}</span>}
             </span>
 
             {mine && !m.is_deleted && (
@@ -146,7 +154,7 @@ export default function MessageBubble({
                 aria-label="options"
                 title="Message options"
               >
-                ⌄
+                ...
               </button>
             )}
           </>
@@ -155,8 +163,12 @@ export default function MessageBubble({
 
       {menuOpenFor === m.id && (
         <div className={`message-menu ${mine ? "align-end" : "align-start"}`}>
-          <button className="menu-item" onClick={() => startEdit(m)}>✏️ Edit</button>
-          <button className="menu-item delete" onClick={() => deleteMessage(m.id)}>🗑️ Delete</button>
+          <button className="menu-item" onClick={() => startEdit(m)}>
+            Edit
+          </button>
+          <button className="menu-item delete" onClick={() => deleteMessage(m.id)}>
+            Delete
+          </button>
         </div>
       )}
     </div>
