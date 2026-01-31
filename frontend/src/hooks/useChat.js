@@ -86,7 +86,7 @@ export default function useChat(user) {
         initialSelected = sorted.find((u) => u.id?.toString() === savedId);
       }
       if (!selected) setSelected(initialSelected || (sorted.length ? sorted[0] : null));
-      setUsers(sorted.map((u) => ({ ...u, unread: u.unread || 0 })));
+      setUsers(sorted.map((u) => ({ ...u, unread: u.unread || 0, is_online: u.is_online || false })));
     } catch (err) {
       console.error("Error fetching users:", err);
     }
@@ -262,6 +262,28 @@ export default function useChat(user) {
         ws.onmessage = (evt) => {
           try {
             const payload = JSON.parse(evt.data);
+
+        if (payload?.type === "presence") {
+          const { user: presenceUserId, online } = payload;
+          if (presenceUserId) {
+            setUsers((prev) =>
+              prev.map((u) => (u.id === presenceUserId ? { ...u, is_online: !!online } : u))
+            );
+            setSelected((prev) =>
+              prev && prev.id === presenceUserId ? { ...prev, is_online: !!online } : prev
+            );
+          }
+          return;
+        }
+
+        if (payload?.type === "presence_sync" && Array.isArray(payload.users)) {
+          const onlineSet = new Set(payload.users);
+          setUsers((prev) => prev.map((u) => ({ ...u, is_online: onlineSet.has(u.id) })));
+          setSelected((prev) =>
+            prev ? { ...prev, is_online: onlineSet.has(prev.id) } : prev
+          );
+          return;
+        }
 
         if (payload?.type === "typing") {
           const typingUserId = payload.user;

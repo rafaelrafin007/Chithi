@@ -1,12 +1,16 @@
 # chat/consumers.py
 import json
 import logging
+import asyncio
 from urllib.parse import parse_qs
 
 from channels.generic.websocket import AsyncJsonWebsocketConsumer
 from channels.db import database_sync_to_async
 
 logger = logging.getLogger(__name__)
+
+ONLINE_USERS = set()
+ONLINE_LOCK = asyncio.Lock()
 
 
 class ChatConsumer(AsyncJsonWebsocketConsumer):
@@ -37,16 +41,34 @@ class ChatConsumer(AsyncJsonWebsocketConsumer):
         # join conversation room and personal group
         await self.channel_layer.group_add(self.room_group_name, self.channel_name)
         await self.channel_layer.group_add(self.user_group_name, self.channel_name)
+        await self.channel_layer.group_add("presence", self.channel_name)
 
         await self.accept()
+
+        # mark online and broadcast presence
+        async with ONLINE_LOCK:
+            ONLINE_USERS.add(self.user.id)
+            online_list = list(ONLINE_USERS)
+        await self.channel_layer.group_send(
+            "presence",
+            {"type": "presence.update", "user": self.user.id, "online": True},
+        )
+        await self.send_json({"type": "presence_sync", "users": online_list})
 
     async def disconnect(self, code):
         if hasattr(self, "room_group_name"):
             await self.channel_layer.group_discard(self.room_group_name, self.channel_name)
         if hasattr(self, "user_group_name"):
             await self.channel_layer.group_discard(self.user_group_name, self.channel_name)
+        await self.channel_layer.group_discard("presence", self.channel_name)
 
         if self.user and self.user.is_authenticated:
+            async with ONLINE_LOCK:
+                ONLINE_USERS.discard(self.user.id)
+            await self.channel_layer.group_send(
+                "presence",
+                {"type": "presence.update", "user": self.user.id, "online": False},
+            )
             await self._update_last_seen(self.user)
 
     async def receive_json(self, content, **kwargs):
@@ -216,6 +238,13 @@ class ChatConsumer(AsyncJsonWebsocketConsumer):
     async def chat_message_deleted(self, event):
         # kept for backwards-compatibility (if any code expects message_deleted)
         await self.send_json({"type": "message_deleted", "data": event["data"]})
+
+    async def presence_update(self, event):
+        await self.send_json({
+            "type": "presence",
+            "user": event.get("user"),
+            "online": event.get("online"),
+        })
 
     # ----------------- helpers (lazy imports) -----------------
     async def _authenticate_from_querystring(self):

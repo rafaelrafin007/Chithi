@@ -100,12 +100,8 @@ export default function ChatPage() {
 
               <div>
                 <h3 style={{ margin: 0 }}>{getDisplayName(selected)}</h3>
-                {selected?.last_message?.sender && (
-                  <small style={{ opacity: 0.7 }}>
-                    {selected.last_message.sender?.id === user?.id
-                      ? "You"
-                      : selected.last_message.sender?.display_name || selected.last_message.sender?.username}
-                  </small>
+                {selected && (
+                  <small style={{ opacity: 0.7 }}>{selected.is_online ? "Online" : "Offline"}</small>
                 )}
               </div>
             </>
