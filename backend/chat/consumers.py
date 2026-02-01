@@ -35,6 +35,9 @@ class ChatConsumer(AsyncJsonWebsocketConsumer):
 
         # other_user_id is the "target" user from the URL (conversation partner)
         self.other_user_id = int(self.scope["url_route"]["kwargs"]["user_id"])
+        if not await self._are_friends(self.user.id, self.other_user_id):
+            await self.close(code=4403)
+            return
         self.room_group_name = await self._room_for_users(self.user.id, self.other_user_id)
         self.user_group_name = f"user_{self.user.id}"
 
@@ -291,6 +294,15 @@ class ChatConsumer(AsyncJsonWebsocketConsumer):
             return User.objects.get(pk=user_id)
         except User.DoesNotExist:
             return None
+
+    @database_sync_to_async
+    def _are_friends(self, user_a_id: int, user_b_id: int):
+        from users.models import FriendRequest
+        return FriendRequest.objects.filter(
+            status=FriendRequest.STATUS_ACCEPTED,
+            from_user__id__in=[user_a_id, user_b_id],
+            to_user__id__in=[user_a_id, user_b_id],
+        ).exists()
 
     @database_sync_to_async
     def _create_message(self, sender, receiver, content: str):

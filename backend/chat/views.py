@@ -8,6 +8,7 @@ from django.core.signing import TimestampSigner
 
 from .models import Message
 from .serializers import UserLiteSerializer, MessageSerializer
+from users.models import are_friends
 
 # Imports for broadcasting to channels
 from asgiref.sync import async_to_sync
@@ -21,7 +22,22 @@ class UsersListView(generics.ListAPIView):
     serializer_class = UserLiteSerializer
 
     def get_queryset(self):
-        return User.objects.exclude(id=self.request.user.id)
+        # Only friends should appear in chat list
+        from users.models import FriendRequest
+        friend_ids = set()
+        accepted = FriendRequest.objects.filter(
+            status=FriendRequest.STATUS_ACCEPTED,
+            from_user__in=[self.request.user],
+        ) | FriendRequest.objects.filter(
+            status=FriendRequest.STATUS_ACCEPTED,
+            to_user__in=[self.request.user],
+        )
+        for fr in accepted:
+            if fr.from_user_id == self.request.user.id:
+                friend_ids.add(fr.to_user_id)
+            else:
+                friend_ids.add(fr.from_user_id)
+        return User.objects.filter(id__in=list(friend_ids))
 
     def get_serializer_context(self):
         context = super().get_serializer_context()
@@ -37,6 +53,8 @@ class ConversationView(APIView):
             other = User.objects.get(pk=user_id)
         except User.DoesNotExist:
             return Response({"detail": "User not found"}, status=404)
+        if not are_friends(request.user, other):
+            return Response({"detail": "Not friends"}, status=403)
 
         qs = Message.objects.filter(
             Q(sender=request.user, receiver=other)
@@ -70,6 +88,8 @@ class SendMessageView(APIView):
             receiver = User.objects.get(pk=receiver_id)
         except User.DoesNotExist:
             return Response({"detail": "Receiver not found"}, status=404)
+        if not are_friends(request.user, receiver):
+            return Response({"detail": "Not friends"}, status=403)
 
         # Create message in DB
         if attachment:

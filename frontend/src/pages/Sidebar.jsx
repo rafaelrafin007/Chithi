@@ -1,11 +1,13 @@
 // src/pages/Sidebar.jsx
 import React, { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import ProfilePanel from "../pages/ProfilePanel";
 
 export default function Sidebar({ users, selected, setSelected, theme, toggleTheme, width }) {
   const { user } = useAuth();
   const [showProfile, setShowProfile] = useState(false);
+  const nav = useNavigate();
 
   const avatarUrl = user?.avatar_url || user?.profile?.avatar_url || null;
   const displayName = user?.display_name || user?.profile?.display_name || user?.username;
@@ -67,7 +69,10 @@ export default function Sidebar({ users, selected, setSelected, theme, toggleThe
           </div>
         </div>
 
-        <label className="switch" title="Toggle theme" style={{ marginLeft: "auto" }}>
+        <button className="btn btn-secondary small" style={{ marginLeft: "auto" }} onClick={() => nav("/friends")}>
+          Friends
+        </button>
+        <label className="switch" title="Toggle theme" style={{ marginLeft: 10 }}>
           <input type="checkbox" checked={theme === "dark"} onChange={toggleTheme} />
           <span className="slider round"></span>
         </label>

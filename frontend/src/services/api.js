@@ -60,6 +60,16 @@ export const updateProfile = (payload = {}, avatarFile = null) => {
   }
 };
 
+/* === Friends === */
+export const getUsersDirectory = () => api.get("/api/auth/users/");
+export const getFriendRequests = () => api.get("/api/auth/friend-requests/");
+export const sendFriendRequest = (toUserId) => api.post("/api/auth/friend-requests/", { to_user_id: toUserId });
+export const respondFriendRequest = (requestId, action) =>
+  api.post(`/api/auth/friend-requests/${requestId}/respond/`, { action });
+export const cancelFriendRequest = (requestId) =>
+  api.post(`/api/auth/friend-requests/${requestId}/cancel/`);
+export const getFriends = () => api.get("/api/auth/friends/");
+
 // ---- Token refresh handling ----
 let isRefreshing = false;
 let refreshQueue = [];

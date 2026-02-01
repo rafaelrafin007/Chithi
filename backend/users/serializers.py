@@ -3,7 +3,7 @@ from django.contrib.auth import get_user_model
 from rest_framework import serializers
 from django.contrib.auth.password_validation import validate_password
 
-from .models import Profile
+from .models import Profile, FriendRequest
 
 User = get_user_model()
 
@@ -68,3 +68,47 @@ class UserProfileSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = ("id", "username", "email", "profile")
+
+
+class UserSimpleSerializer(serializers.ModelSerializer):
+    display_name = serializers.SerializerMethodField()
+    avatar_url = serializers.SerializerMethodField()
+
+    class Meta:
+        model = User
+        fields = ("id", "username", "display_name", "avatar_url")
+
+    def get_display_name(self, obj):
+        profile = getattr(obj, "profile", None)
+        if profile:
+            return getattr(profile, "display_name", None) or obj.username
+        return getattr(obj, "display_name", None) or obj.username
+
+    def get_avatar_url(self, obj):
+        profile = getattr(obj, "profile", None)
+        url = None
+        if profile:
+            avatar_field = getattr(profile, "avatar", None)
+            if avatar_field:
+                try:
+                    url = avatar_field.url
+                except Exception:
+                    url = None
+        if not url:
+            url = getattr(obj, "avatar_url", None) or None
+        request = self.context.get("request")
+        if url and request:
+            try:
+                return request.build_absolute_uri(url)
+            except Exception:
+                return url
+        return url
+
+
+class FriendRequestSerializer(serializers.ModelSerializer):
+    from_user = UserSimpleSerializer(read_only=True)
+    to_user = UserSimpleSerializer(read_only=True)
+
+    class Meta:
+        model = FriendRequest
+        fields = ("id", "from_user", "to_user", "status", "created_at", "updated_at")
