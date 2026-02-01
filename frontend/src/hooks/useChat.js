@@ -33,6 +33,28 @@ export default function useChat(user) {
   const [editingMessageId, setEditingMessageId] = useState(null);
   const [editingText, setEditingText] = useState("");
 
+  const showDesktopNotification = useCallback((msg) => {
+    if (!msg || !msg.sender) return;
+    if (!("Notification" in window)) return;
+    if (Notification.permission === "default") {
+      Notification.requestPermission().catch(() => {});
+      return;
+    }
+    if (Notification.permission !== "granted") return;
+    if (!document.hidden) return;
+    const title = msg.sender?.display_name || msg.sender?.username || "New message";
+    const body = msg.content || (msg.attachment_url ? "Sent an attachment" : "New message");
+    try {
+      new Notification(title, {
+        body,
+        tag: `chat-${msg.sender?.id || "unknown"}`,
+        icon: msg.sender?.avatar_url || undefined,
+      });
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
   // ----- Helpers -----
   const normalizeUser = (u = {}) => {
     // Defensive normalization: support several backends shapes
@@ -379,6 +401,9 @@ export default function useChat(user) {
             if (msg.receiver?.id === user?.id && msg.id && !deliveredAcksRef.current.has(msg.id)) {
               deliveredAcksRef.current.add(msg.id);
               sendWhenWsReady({ type: "delivered", message_id: msg.id });
+            }
+            if (msg.sender?.id !== user?.id) {
+              showDesktopNotification(msg);
             }
             scrollToBottom();
           }
