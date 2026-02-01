@@ -73,10 +73,6 @@ export default function Sidebar({ users, selected, setSelected, theme, toggleThe
         <button className="btn btn-secondary small" style={{ marginLeft: "auto" }} onClick={() => nav("/friends")}>
           Friends
         </button>
-        <label className="switch" title="Toggle theme" style={{ marginLeft: 10 }}>
-          <input type="checkbox" checked={theme === "dark"} onChange={toggleTheme} />
-          <span className="slider round"></span>
-        </label>
       </div>
 
       {/* Profile panel (overlay) */}
