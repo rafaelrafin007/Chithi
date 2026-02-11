@@ -7,6 +7,8 @@ from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 
 from rest_framework_simplejwt.views import TokenObtainPairView
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
+from asgiref.sync import async_to_sync
+from channels.layers import get_channel_layer
 
 from .serializers import RegisterSerializer, UserProfileSerializer, ProfileSerializer, UserSimpleSerializer, FriendRequestSerializer
 from .models import Profile, FriendRequest
@@ -138,6 +140,15 @@ class FriendRequestsView(APIView):
                 return Response(FriendRequestSerializer(existing, context={"request": request}).data, status=200)
 
         fr = FriendRequest.objects.create(from_user=request.user, to_user=to_user)
+        try:
+            channel_layer = get_channel_layer()
+            async_to_sync(channel_layer.group_send)(
+                f"user_{to_user.id}",
+                {"type": "friend.request", "from_user": UserSimpleSerializer(request.user, context={"request": request}).data},
+            )
+        except Exception:
+            import logging
+            logging.exception("Failed to broadcast friend request")
         return Response(FriendRequestSerializer(fr, context={"request": request}).data, status=201)
 
 

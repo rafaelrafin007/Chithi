@@ -55,6 +55,27 @@ export default function useChat(user) {
     }
   }, []);
 
+  const showFriendRequestNotification = useCallback((fromUser) => {
+    if (!("Notification" in window)) return;
+    if (Notification.permission === "default") {
+      Notification.requestPermission().catch(() => {});
+      return;
+    }
+    if (Notification.permission !== "granted") return;
+    if (!document.hidden) return;
+    const title = "New friend request";
+    const body = `${fromUser?.display_name || fromUser?.username || "Someone"} sent you a friend request`;
+    try {
+      new Notification(title, {
+        body,
+        tag: `friend-request-${fromUser?.id || "unknown"}`,
+        icon: fromUser?.avatar_url || undefined,
+      });
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
   // ----- Helpers -----
   const normalizeUser = (u = {}) => {
     // Defensive normalization: support several backends shapes
@@ -304,6 +325,11 @@ export default function useChat(user) {
           setSelected((prev) =>
             prev ? { ...prev, is_online: onlineSet.has(prev.id) } : prev
           );
+          return;
+        }
+
+        if (payload?.type === "friend_request") {
+          showFriendRequestNotification(payload.from_user);
           return;
         }
 

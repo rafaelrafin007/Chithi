@@ -249,6 +249,12 @@ class ChatConsumer(AsyncJsonWebsocketConsumer):
             "online": event.get("online"),
         })
 
+    async def friend_request(self, event):
+        await self.send_json({
+            "type": "friend_request",
+            "from_user": event.get("from_user"),
+        })
+
     # ----------------- helpers (lazy imports) -----------------
     async def _authenticate_from_querystring(self):
         try:
