@@ -179,6 +179,27 @@ class ChatConsumer(AsyncJsonWebsocketConsumer):
                 )
             return
 
+        # React to a message
+        if event_type == "react":
+            message_id = content.get("message_id")
+            emoji = (content.get("emoji") or "").strip()
+            if not message_id or not emoji:
+                return
+            updated = await self._toggle_reaction(message_id, self.user.id, emoji)
+            if updated is None:
+                return
+            await self.channel_layer.group_send(
+                self.room_group_name,
+                {
+                    "type": "chat.reaction",
+                    "message_id": message_id,
+                    "emoji": emoji,
+                    "user": self.user.id,
+                    "action": "added" if updated else "removed",
+                },
+            )
+            return
+
         # Regular message -> create DB object and broadcast to:
         #  - conversation room (chat.message)
         #  - recipient personal group (chat.sidebar) so they get sidebar update even if not in the room
@@ -241,6 +262,15 @@ class ChatConsumer(AsyncJsonWebsocketConsumer):
     async def chat_message_deleted(self, event):
         # kept for backwards-compatibility (if any code expects message_deleted)
         await self.send_json({"type": "message_deleted", "data": event["data"]})
+
+    async def chat_reaction(self, event):
+        await self.send_json({
+            "type": "reaction",
+            "message_id": event.get("message_id"),
+            "emoji": event.get("emoji"),
+            "user": event.get("user"),
+            "action": event.get("action"),
+        })
 
     async def presence_update(self, event):
         await self.send_json({
@@ -371,6 +401,23 @@ class ChatConsumer(AsyncJsonWebsocketConsumer):
             return Message.objects.get(pk=message_id)
         except Message.DoesNotExist:
             return None
+
+    @database_sync_to_async
+    def _toggle_reaction(self, message_id: int, user_id: int, emoji: str):
+        from .models import MessageReaction, Message
+        try:
+            msg = Message.objects.only("id", "sender_id", "receiver_id").get(pk=message_id)
+        except Message.DoesNotExist:
+            return None
+        # ensure user is a participant
+        if user_id not in (msg.sender_id, msg.receiver_id):
+            return None
+        existing = MessageReaction.objects.filter(message_id=message_id, user_id=user_id, emoji=emoji).first()
+        if existing:
+            existing.delete()
+            return False
+        MessageReaction.objects.create(message_id=message_id, user_id=user_id, emoji=emoji)
+        return True
 
     @database_sync_to_async
     def _edit_message(self, message_id: int, new_content: str):

@@ -128,6 +128,8 @@ export default function ChatPage() {
                 submitEdit={chat.submitEdit}
                 deleteMessage={chat.deleteMessage}
                 formatTimestamp={chat.formatTimestamp}
+                onReact={chat.sendReaction}
+                currentUserId={user?.id}
               />
             );
           })}

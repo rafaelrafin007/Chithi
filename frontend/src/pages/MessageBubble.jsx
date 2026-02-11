@@ -23,6 +23,8 @@ export default function MessageBubble({
   submitEdit,
   deleteMessage,
   formatTimestamp,
+  onReact,
+  currentUserId,
 }) {
   const isEditingThis = editingMessageId === m.id;
 
@@ -138,6 +140,36 @@ export default function MessageBubble({
                 )}
               </div>
             )}
+
+            {/* Reactions */}
+            {Array.isArray(m.reactions) && m.reactions.length > 0 && (
+              <div className="reaction-row">
+                {m.reactions.map((r) => (
+                  <button
+                    key={`${m.id}-${r.emoji}`}
+                    className={`reaction-chip ${r.users?.includes(currentUserId) ? "active" : ""}`}
+                    onClick={() => onReact?.(m.id, r.emoji)}
+                  >
+                    <span>{r.emoji}</span>
+                    <span className="reaction-count">{r.count}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {/* Quick reactions */}
+            <div className="reaction-actions">
+              {["👍", "❤️", "😂", "😮", "😢"].map((emoji) => (
+                <button
+                  key={`${m.id}-${emoji}`}
+                  className="reaction-btn"
+                  onClick={() => onReact?.(m.id, emoji)}
+                  title="React"
+                >
+                  {emoji}
+                </button>
+              ))}
+            </div>
 
             <span className="chat-timestamp">
               {formatTimestamp(m.timestamp)}

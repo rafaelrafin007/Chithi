@@ -1,7 +1,7 @@
 # chat/serializers.py
 from django.contrib.auth import get_user_model
 from rest_framework import serializers
-from .models import Message
+from .models import Message, MessageReaction
 from django.db.models import Q
 import os
 import mimetypes
@@ -16,6 +16,7 @@ class MessageSerializer(serializers.ModelSerializer):
     attachment_url = serializers.SerializerMethodField()
     attachment_name = serializers.SerializerMethodField()
     attachment_type = serializers.SerializerMethodField()
+    reactions = serializers.SerializerMethodField()
 
     class Meta:
         model = Message
@@ -31,6 +32,7 @@ class MessageSerializer(serializers.ModelSerializer):
             "attachment_url",
             "attachment_name",
             "attachment_type",
+            "reactions",
         )
 
     def _build_absolute(self, url):
@@ -111,6 +113,15 @@ class MessageSerializer(serializers.ModelSerializer):
             return None
         mimetype, _ = mimetypes.guess_type(getattr(obj.attachment, "name", "") or "")
         return mimetype  # e.g. "image/png" or "application/pdf"
+
+    def get_reactions(self, obj):
+        qs = MessageReaction.objects.filter(message=obj).values_list("emoji", "user_id")
+        by_emoji = {}
+        for emoji, user_id in qs:
+            entry = by_emoji.setdefault(emoji, {"emoji": emoji, "count": 0, "users": []})
+            entry["count"] += 1
+            entry["users"].append(user_id)
+        return list(by_emoji.values())
 
 
 class UserLiteSerializer(serializers.ModelSerializer):

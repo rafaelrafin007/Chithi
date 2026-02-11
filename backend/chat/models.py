@@ -26,3 +26,16 @@ class Message(models.Model):
     def __str__(self):
         preview = (self.content or "")[:20]
         return f"{self.sender} → {self.receiver}: {preview}"
+
+
+class MessageReaction(models.Model):
+    message = models.ForeignKey(Message, related_name="reactions", on_delete=models.CASCADE)
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, related_name="message_reactions", on_delete=models.CASCADE)
+    emoji = models.CharField(max_length=16)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ("message", "user", "emoji")
+
+    def __str__(self):
+        return f"{self.user_id} {self.emoji} {self.message_id}"

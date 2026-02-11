@@ -76,6 +76,13 @@ export default function useChat(user) {
     }
   }, []);
 
+  const sendReaction = (messageId, emoji) => {
+    if (!messageId || !emoji) return;
+    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify({ type: "react", message_id: messageId, emoji }));
+    }
+  };
+
   // ----- Helpers -----
   const normalizeUser = (u = {}) => {
     // Defensive normalization: support several backends shapes
@@ -448,6 +455,37 @@ export default function useChat(user) {
           return;
         }
 
+        if (payload?.type === "reaction") {
+          const { message_id, emoji, user: reactorId, action } = payload;
+          if (!message_id || !emoji || !reactorId) return;
+          setMessages((prev) =>
+            prev.map((m) => {
+              if (m.id !== message_id) return m;
+              const reactions = Array.isArray(m.reactions) ? [...m.reactions] : [];
+              const idx = reactions.findIndex((r) => r.emoji === emoji);
+              if (idx === -1) {
+                if (action === "added") {
+                  reactions.push({ emoji, count: 1, users: [reactorId] });
+                }
+              } else {
+                const entry = { ...reactions[idx] };
+                const users = new Set(entry.users || []);
+                if (action === "added") users.add(reactorId);
+                if (action === "removed") users.delete(reactorId);
+                entry.users = Array.from(users);
+                entry.count = entry.users.length;
+                if (entry.count === 0) {
+                  reactions.splice(idx, 1);
+                } else {
+                  reactions[idx] = entry;
+                }
+              }
+              return { ...m, reactions };
+            })
+          );
+          return;
+        }
+
         // message_deleted
         if (payload?.type === "message_deleted" && payload?.data) {
           const { id } = payload.data;
@@ -706,6 +744,7 @@ export default function useChat(user) {
     formatTimestamp,
     handleTyping,
     send,
+    sendReaction,
     startEdit,
     cancelEdit,
     submitEdit,
