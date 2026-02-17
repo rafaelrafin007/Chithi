@@ -185,17 +185,18 @@ class ChatConsumer(AsyncJsonWebsocketConsumer):
             emoji = (content.get("emoji") or "").strip()
             if not message_id or not emoji:
                 return
-            updated = await self._toggle_reaction(message_id, self.user.id, emoji)
-            if updated is None:
+            result = await self._set_reaction(message_id, self.user.id, emoji)
+            if result is None:
                 return
             await self.channel_layer.group_send(
                 self.room_group_name,
                 {
                     "type": "chat.reaction",
                     "message_id": message_id,
-                    "emoji": emoji,
+                    "emoji": result.get("emoji"),
+                    "old_emoji": result.get("old_emoji"),
                     "user": self.user.id,
-                    "action": "added" if updated else "removed",
+                    "action": result.get("action"),
                 },
             )
             return
@@ -403,7 +404,7 @@ class ChatConsumer(AsyncJsonWebsocketConsumer):
             return None
 
     @database_sync_to_async
-    def _toggle_reaction(self, message_id: int, user_id: int, emoji: str):
+    def _set_reaction(self, message_id: int, user_id: int, emoji: str):
         from .models import MessageReaction, Message
         try:
             msg = Message.objects.only("id", "sender_id", "receiver_id").get(pk=message_id)
@@ -412,12 +413,17 @@ class ChatConsumer(AsyncJsonWebsocketConsumer):
         # ensure user is a participant
         if user_id not in (msg.sender_id, msg.receiver_id):
             return None
-        existing = MessageReaction.objects.filter(message_id=message_id, user_id=user_id, emoji=emoji).first()
+        existing = MessageReaction.objects.filter(message_id=message_id, user_id=user_id).first()
         if existing:
-            existing.delete()
-            return False
+            if existing.emoji == emoji:
+                existing.delete()
+                return {"action": "removed", "emoji": emoji, "old_emoji": emoji}
+            old_emoji = existing.emoji
+            existing.emoji = emoji
+            existing.save(update_fields=["emoji"])
+            return {"action": "switched", "emoji": emoji, "old_emoji": old_emoji}
         MessageReaction.objects.create(message_id=message_id, user_id=user_id, emoji=emoji)
-        return True
+        return {"action": "added", "emoji": emoji, "old_emoji": None}
 
     @database_sync_to_async
     def _edit_message(self, message_id: int, new_content: str):

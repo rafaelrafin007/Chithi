@@ -684,8 +684,8 @@ body.dark-theme .btn-secondary {
 
 .reaction-plus {
   position: absolute;
-  top: 6px;
-  left: 6px;
+  top: -10px;
+  right: -10px;
   border: none;
   background: rgba(0, 0, 0, 0.2);
   color: inherit;
@@ -698,7 +698,7 @@ body.dark-theme .btn-secondary {
   transition: opacity 0.2s ease;
 }
 
-.message-row:hover .reaction-plus {
+.message:hover .reaction-plus {
   opacity: 1;
   pointer-events: auto;
 }
