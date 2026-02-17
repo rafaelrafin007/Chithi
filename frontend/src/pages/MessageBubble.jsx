@@ -27,6 +27,7 @@ export default function MessageBubble({
   currentUserId,
 }) {
   const isEditingThis = editingMessageId === m.id;
+  const [showReactions, setShowReactions] = React.useState(false);
 
   // Determine attachment presence (fields may vary depending on serializer)
   const attachmentUrl = m.attachment_url || m.attachment || null;
@@ -141,7 +142,7 @@ export default function MessageBubble({
               </div>
             )}
 
-            {/* Reactions */}
+            {/* Reactions summary */}
             {Array.isArray(m.reactions) && m.reactions.length > 0 && (
               <div className="reaction-row">
                 {m.reactions.map((r) => (
@@ -157,19 +158,24 @@ export default function MessageBubble({
               </div>
             )}
 
-            {/* Quick reactions */}
-            <div className="reaction-actions">
-              {["👍", "❤️", "😂", "😮", "😢"].map((emoji) => (
-                <button
-                  key={`${m.id}-${emoji}`}
-                  className="reaction-btn"
-                  onClick={() => onReact?.(m.id, emoji)}
-                  title="React"
-                >
-                  {emoji}
-                </button>
-              ))}
-            </div>
+            {/* Reaction tray */}
+            {showReactions && (
+              <div className="reaction-tray">
+                {["👍", "❤️", "😂", "😮", "😢"].map((emoji) => (
+                  <button
+                    key={`${m.id}-${emoji}`}
+                    className="reaction-btn"
+                    onClick={() => {
+                      onReact?.(m.id, emoji);
+                      setShowReactions(false);
+                    }}
+                    title="React"
+                  >
+                    {emoji}
+                  </button>
+                ))}
+              </div>
+            )}
 
             <span className="chat-timestamp">
               {formatTimestamp(m.timestamp)}
@@ -187,6 +193,20 @@ export default function MessageBubble({
                 title="Message options"
               >
                 ...
+              </button>
+            )}
+
+            {!m.is_deleted && (
+              <button
+                className="reaction-plus"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowReactions((s) => !s);
+                }}
+                aria-label="add reaction"
+                title="Add reaction"
+              >
+                +
               </button>
             )}
           </>
