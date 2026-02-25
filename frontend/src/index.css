@@ -713,6 +713,14 @@ body.dark-theme .btn-secondary {
   margin-top: 6px;
 }
 
+.reaction-tray.floating {
+  position: absolute;
+  top: -40px;
+  right: 10px;
+  z-index: 5;
+  margin-top: 0;
+}
+
 /* mobile tweaks */
 @media (max-width: 480px) {
   .message-menu { min-width: 120px; }
