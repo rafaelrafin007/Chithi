@@ -721,6 +721,16 @@ body.dark-theme .btn-secondary {
   margin-top: 0;
 }
 
+.reaction-tray.floating.left {
+  right: auto;
+  left: 10px;
+}
+
+.reaction-tray.floating.right {
+  left: auto;
+  right: 10px;
+}
+
 /* mobile tweaks */
 @media (max-width: 480px) {
   .message-menu { min-width: 120px; }

@@ -160,7 +160,7 @@ export default function MessageBubble({
 
             {/* Reaction tray */}
             {showReactions && (
-              <div className="reaction-tray floating">
+              <div className={`reaction-tray floating ${mine ? "right" : "left"}`}>
                 {["👍", "❤️", "😂", "😮", "😢"].map((emoji) => (
                   <button
                     key={`${m.id}-${emoji}`}
