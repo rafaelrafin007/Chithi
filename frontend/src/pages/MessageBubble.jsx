@@ -1,4 +1,4 @@
-// src/components/MessageBubble.jsx
+﻿// src/components/MessageBubble.jsx
 import React from "react";
 
 /**
@@ -226,3 +226,4 @@ export default function MessageBubble({
     </div>
   );
 }
+

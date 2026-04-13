@@ -20,6 +20,7 @@ export default function useChat(user) {
 
   const messagesEndRef = useRef(null);
   const wsRef = useRef(null);
+  const latestMessagesRef = useRef([]);
   const typingTimeoutRef = useRef(null);
   const lastTypingSentRef = useRef(0);
   const deliveredAcksRef = useRef(new Set());
@@ -113,6 +114,10 @@ export default function useChat(user) {
     document.body.classList.add(theme + "-theme");
     localStorage.setItem("theme", theme);
   }, [theme]);
+
+  useEffect(() => {
+    latestMessagesRef.current = messages;
+  }, [messages]);
 
   const toggleTheme = useCallback(() => {
     setTheme((prev) => (prev === "dark" ? "light" : "dark"));
@@ -303,8 +308,9 @@ export default function useChat(user) {
         wsRef.current = ws;
 
         ws.onopen = () => {
-          if (messages.length) {
-            const lastTs = messages[messages.length - 1].timestamp;
+          const latestMessages = latestMessagesRef.current;
+          if (latestMessages.length) {
+            const lastTs = latestMessages[latestMessages.length - 1].timestamp;
             sendWhenWsReady({ type: "read", last_read: lastTs });
           }
         };
@@ -559,11 +565,11 @@ export default function useChat(user) {
       cancelled = true;
       clearTimeout(typingTimeoutRef.current);
       try {
-        ws.close();
+        wsRef.current?.close();
       } catch {}
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selected?.id, user?.id, messages.length]);
+  }, [selected?.id, user?.id]);
 
   // --- Send Message ---
   const send = async () => {

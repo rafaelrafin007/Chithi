@@ -269,6 +269,7 @@ class ChatConsumer(AsyncJsonWebsocketConsumer):
             "type": "reaction",
             "message_id": event.get("message_id"),
             "emoji": event.get("emoji"),
+            "old_emoji": event.get("old_emoji"),
             "user": event.get("user"),
             "action": event.get("action"),
         })
