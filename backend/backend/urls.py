@@ -6,6 +6,7 @@ from django.conf.urls.static import static
 urlpatterns = [
     path('admin/', admin.site.urls),
     path("api/auth/", include("users.urls")),  # register/login/me
+    path("api/social/", include("users.social_urls")),  # profiles, follows, posts, likes, comments
     path("api/chat/", include("chat.urls")),   # users list, conversation, send
 ]
 
