@@ -1,6 +1,8 @@
 // src/pages/Friends.jsx
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import SocialNav from "../components/SocialNav";
+import FollowButton from "../components/FollowButton";
 import {
   getUsersDirectory,
   getFriendRequests,
@@ -15,6 +17,12 @@ export default function Friends() {
   const [outgoing, setOutgoing] = useState([]);
   const [loading, setLoading] = useState(true);
   const nav = useNavigate();
+
+  useEffect(() => {
+    const theme = localStorage.getItem("theme") || "dark";
+    document.body.classList.remove("light-theme", "dark-theme");
+    document.body.classList.add(`${theme}-theme`);
+  }, []);
 
   const load = async () => {
     setLoading(true);
@@ -49,6 +57,14 @@ export default function Friends() {
     await load();
   };
 
+  const handleFollowChanged = (userId, nextFollowing) => {
+    setUsers((prev) =>
+      prev.map((item) =>
+        item.id === userId ? { ...item, is_following: nextFollowing } : item
+      )
+    );
+  };
+
   return (
     <div className="friends-page">
       <div className="friends-shell">
@@ -57,9 +73,12 @@ export default function Friends() {
             <div className="friends-kicker">Network</div>
             <h2>Friends</h2>
           </div>
-          <button className="btn btn-secondary" onClick={() => nav("/chat")}>
-            Back to chat
-          </button>
+          <div className="friends-header-actions">
+            <SocialNav />
+            <button className="btn btn-secondary" onClick={() => nav("/chat")}>
+              Back to chat
+            </button>
+          </div>
         </div>
 
         {loading ? (
@@ -118,6 +137,11 @@ export default function Friends() {
                 {u.friend_status === "outgoing" && <div className="friends-meta">Pending</div>}
               </div>
               <div className="friends-actions">
+                <FollowButton
+                  identifier={u.username || u.id}
+                  isFollowing={!!u.is_following}
+                  onChange={(nextFollowing) => handleFollowChanged(u.id, nextFollowing)}
+                />
                 {u.friend_status === "none" && (
                   <button className="btn btn-primary" onClick={() => handleSend(u.id)}>
                     Add friend

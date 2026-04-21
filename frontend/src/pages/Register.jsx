@@ -13,7 +13,7 @@ export default function Register() {
     try {
       setErr("");
       await register(form);
-      nav("/chat");
+      nav("/feed");
     } catch {
       setErr("Registration failed");
     }

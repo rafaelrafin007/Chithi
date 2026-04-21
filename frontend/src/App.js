@@ -6,6 +6,8 @@ import Login from "./pages/Login";
 import Register from "./pages/Register";
 import ChatPage from "./pages/ChatPage";
 import Friends from "./pages/Friends";
+import FeedPage from "./pages/FeedPage";
+import ProfilePage from "./pages/ProfilePage";
 
 
 export default function App() {
@@ -13,9 +15,17 @@ export default function App() {
     <AuthProvider>
       <BrowserRouter>
         <Routes>
-          <Route path="/" element={<Navigate to="/chat" replace />} />
+          <Route path="/" element={<Navigate to="/feed" replace />} />
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
+          <Route
+            path="/feed"
+            element={
+              <ProtectedRoute>
+                <FeedPage />
+              </ProtectedRoute>
+            }
+          />
 
           <Route
             path="/chat"
@@ -33,8 +43,16 @@ export default function App() {
               </ProtectedRoute>
             }
           />
+          <Route
+            path="/profile/:identifier"
+            element={
+              <ProtectedRoute>
+                <ProfilePage />
+              </ProtectedRoute>
+            }
+          />
 
-          <Route path="*" element={<Navigate to="/chat" replace />} />
+          <Route path="*" element={<Navigate to="/feed" replace />} />
         </Routes>
       </BrowserRouter>
     </AuthProvider>

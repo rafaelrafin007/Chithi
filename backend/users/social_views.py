@@ -142,14 +142,7 @@ class FeedView(APIView):
     pagination_class = StandardPagination
 
     def get(self, request):
-        followed_ids = Follow.objects.filter(follower=request.user).values("following_id")
-        queryset = Post.objects.filter(is_deleted=False).filter(
-            Q(author=request.user)
-            | Q(
-                author_id__in=Subquery(followed_ids),
-                visibility__in=[Post.VISIBILITY_PUBLIC, Post.VISIBILITY_FOLLOWERS_ONLY],
-            )
-        )
+        queryset = _visible_posts_queryset_for_user(request.user)
         queryset = _annotated_posts_queryset(request.user, queryset)
 
         paginator = self.pagination_class()

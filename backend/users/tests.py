@@ -21,6 +21,18 @@ class SocialLayerAPITests(APITestCase):
             return response.data["results"]
         return response.data
 
+    def _feed_post_ids(self, user):
+        self._auth(user)
+        response = self.client.get("/api/social/feed/")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        return [item["id"] for item in self._results(response)]
+
+    def _profile_post_ids(self, viewer, target_user):
+        self._auth(viewer)
+        response = self.client.get(f"/api/social/profiles/{target_user.id}/posts/")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        return [item["id"] for item in self._results(response)]
+
     def test_self_follow_blocked(self):
         self._auth(self.alice)
         url = f"/api/social/profiles/{self.alice.id}/follow/"
@@ -69,6 +81,109 @@ class SocialLayerAPITests(APITestCase):
         self.assertEqual(response_non_follower.status_code, status.HTTP_200_OK)
         non_follower_results = self._results(response_non_follower)
         self.assertFalse(any(item["id"] == post.id for item in non_follower_results))
+
+    def test_feed_non_follower_sees_public_post(self):
+        public_post = Post.objects.create(
+            author=self.alice,
+            content="Visible to everyone",
+            visibility=Post.VISIBILITY_PUBLIC,
+        )
+        feed_ids = self._feed_post_ids(self.charlie)
+        self.assertIn(public_post.id, feed_ids)
+
+    def test_feed_non_follower_cannot_see_followers_only_post(self):
+        followers_only_post = Post.objects.create(
+            author=self.alice,
+            content="Followers only",
+            visibility=Post.VISIBILITY_FOLLOWERS_ONLY,
+        )
+        feed_ids = self._feed_post_ids(self.charlie)
+        self.assertNotIn(followers_only_post.id, feed_ids)
+
+    def test_feed_follower_can_see_followers_only_post(self):
+        Follow.objects.create(follower=self.bob, following=self.alice)
+        followers_only_post = Post.objects.create(
+            author=self.alice,
+            content="Followers can read this",
+            visibility=Post.VISIBILITY_FOLLOWERS_ONLY,
+        )
+        feed_ids = self._feed_post_ids(self.bob)
+        self.assertIn(followers_only_post.id, feed_ids)
+
+    def test_feed_private_post_visible_only_to_author(self):
+        private_post = Post.objects.create(
+            author=self.alice,
+            content="Private note",
+            visibility=Post.VISIBILITY_PRIVATE,
+        )
+        author_feed_ids = self._feed_post_ids(self.alice)
+        non_author_feed_ids = self._feed_post_ids(self.bob)
+        self.assertIn(private_post.id, author_feed_ids)
+        self.assertNotIn(private_post.id, non_author_feed_ids)
+
+    def test_feed_has_no_duplicate_posts(self):
+        Follow.objects.create(follower=self.bob, following=self.alice)
+        public_post = Post.objects.create(
+            author=self.alice,
+            content="Public should appear once",
+            visibility=Post.VISIBILITY_PUBLIC,
+        )
+        Post.objects.create(
+            author=self.bob,
+            content="Bob post",
+            visibility=Post.VISIBILITY_PUBLIC,
+        )
+        feed_ids = self._feed_post_ids(self.bob)
+        self.assertEqual(len(feed_ids), len(set(feed_ids)))
+        self.assertEqual(feed_ids.count(public_post.id), 1)
+
+    def test_profile_posts_visibility_rules(self):
+        public_post = Post.objects.create(
+            author=self.alice,
+            content="Public profile post",
+            visibility=Post.VISIBILITY_PUBLIC,
+        )
+        followers_post = Post.objects.create(
+            author=self.alice,
+            content="Followers profile post",
+            visibility=Post.VISIBILITY_FOLLOWERS_ONLY,
+        )
+        private_post = Post.objects.create(
+            author=self.alice,
+            content="Private profile post",
+            visibility=Post.VISIBILITY_PRIVATE,
+        )
+        Follow.objects.create(follower=self.bob, following=self.alice)
+
+        owner_ids = self._profile_post_ids(self.alice, self.alice)
+        follower_ids = self._profile_post_ids(self.bob, self.alice)
+        non_follower_ids = self._profile_post_ids(self.charlie, self.alice)
+
+        self.assertIn(public_post.id, owner_ids)
+        self.assertIn(followers_post.id, owner_ids)
+        self.assertIn(private_post.id, owner_ids)
+
+        self.assertIn(public_post.id, follower_ids)
+        self.assertIn(followers_post.id, follower_ids)
+        self.assertNotIn(private_post.id, follower_ids)
+
+        self.assertIn(public_post.id, non_follower_ids)
+        self.assertNotIn(followers_post.id, non_follower_ids)
+        self.assertNotIn(private_post.id, non_follower_ids)
+
+    def test_users_directory_includes_is_following(self):
+        Follow.objects.create(follower=self.alice, following=self.bob)
+        self._auth(self.alice)
+        response = self.client.get("/api/auth/users/")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        payload = response.data
+        bob_entry = next((u for u in payload if u["id"] == self.bob.id), None)
+        charlie_entry = next((u for u in payload if u["id"] == self.charlie.id), None)
+        self.assertIsNotNone(bob_entry)
+        self.assertIsNotNone(charlie_entry)
+        self.assertIn("is_following", bob_entry)
+        self.assertTrue(bob_entry["is_following"])
+        self.assertFalse(charlie_entry["is_following"])
 
     def test_like_uniqueness(self):
         post = Post.objects.create(author=self.alice, content="Public post", visibility=Post.VISIBILITY_PUBLIC)

@@ -70,6 +70,51 @@ export const cancelFriendRequest = (requestId) =>
   api.post(`/api/auth/friend-requests/${requestId}/cancel/`);
 export const getFriends = () => api.get("/api/auth/friends/");
 
+/* === Social === */
+const SOCIAL_BASE = "/api/social";
+
+export const socialApi = {
+  getFeed: (params = {}) => api.get(`${SOCIAL_BASE}/feed/`, { params }),
+  createPost: ({ content = "", visibility = "public", image = null } = {}) => {
+    const fd = new FormData();
+    if (content !== undefined && content !== null) fd.append("content", content);
+    if (visibility) fd.append("visibility", visibility);
+    if (image) fd.append("image", image);
+    return api.post(`${SOCIAL_BASE}/feed/`, fd, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
+  },
+  getProfile: (identifier) => api.get(`${SOCIAL_BASE}/profiles/${identifier}/`),
+  followUser: (identifier) => api.post(`${SOCIAL_BASE}/profiles/${identifier}/follow/`),
+  unfollowUser: (identifier) => api.post(`${SOCIAL_BASE}/profiles/${identifier}/unfollow/`),
+  getProfilePosts: (identifier, params = {}) =>
+    api.get(`${SOCIAL_BASE}/profiles/${identifier}/posts/`, { params }),
+  likePost: (postId) => api.post(`${SOCIAL_BASE}/posts/${postId}/like/`),
+  unlikePost: (postId) => api.post(`${SOCIAL_BASE}/posts/${postId}/unlike/`),
+  getComments: (postId, params = {}) =>
+    api.get(`${SOCIAL_BASE}/posts/${postId}/comments/`, { params }),
+  createComment: (postId, payload) => api.post(`${SOCIAL_BASE}/posts/${postId}/comments/`, payload),
+  editComment: (commentId, payload) => api.patch(`${SOCIAL_BASE}/comments/${commentId}/`, payload),
+  deleteComment: (commentId) => api.delete(`${SOCIAL_BASE}/comments/${commentId}/`),
+  editPost: (postId, payload) => api.patch(`${SOCIAL_BASE}/posts/${postId}/`, payload),
+  deletePost: (postId) => api.delete(`${SOCIAL_BASE}/posts/${postId}/`),
+};
+
+export const getFeed = socialApi.getFeed;
+export const createPost = socialApi.createPost;
+export const getSocialProfile = socialApi.getProfile;
+export const followUser = socialApi.followUser;
+export const unfollowUser = socialApi.unfollowUser;
+export const getProfilePosts = socialApi.getProfilePosts;
+export const likePost = socialApi.likePost;
+export const unlikePost = socialApi.unlikePost;
+export const getComments = socialApi.getComments;
+export const createComment = socialApi.createComment;
+export const editComment = socialApi.editComment;
+export const deleteComment = socialApi.deleteComment;
+export const editPost = socialApi.editPost;
+export const deletePost = socialApi.deletePost;
+
 // ---- Token refresh handling ----
 let isRefreshing = false;
 let refreshQueue = [];

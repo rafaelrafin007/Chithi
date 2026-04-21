@@ -16,7 +16,7 @@ export default function Login() {
     setLoading(true);
     try {
       await login(form);
-      nav("/chat");
+      nav("/feed");
     } catch (errorMessage) {
       // errorMessage is a normalized string from AuthContext
       setErr(typeof errorMessage === "string" ? errorMessage : "Invalid username or password");

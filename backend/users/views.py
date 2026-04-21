@@ -11,7 +11,7 @@ from asgiref.sync import async_to_sync
 from channels.layers import get_channel_layer
 
 from .serializers import RegisterSerializer, UserProfileSerializer, ProfileSerializer, UserSimpleSerializer, FriendRequestSerializer
-from .models import Profile, FriendRequest
+from .models import Profile, FriendRequest, Follow
 
 User = get_user_model()
 
@@ -84,6 +84,9 @@ class UsersDirectoryView(APIView):
 
     def get(self, request):
         users = User.objects.exclude(id=request.user.id)
+        following_ids = set(
+            Follow.objects.filter(follower=request.user).values_list("following_id", flat=True)
+        )
         data = []
         for u in users:
             status_label = "none"
@@ -99,6 +102,7 @@ class UsersDirectoryView(APIView):
                     status_label = "declined"
             serialized = UserSimpleSerializer(u, context={"request": request}).data
             serialized["friend_status"] = status_label
+            serialized["is_following"] = u.id in following_ids
             data.append(serialized)
         return Response(data)
 

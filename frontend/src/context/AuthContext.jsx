@@ -1,6 +1,6 @@
 // src/context/AuthContext.jsx
 import React, { createContext, useContext, useEffect, useState } from "react";
-import api, { getProfile, updateProfile as apiUpdateProfile } from "../services/api";
+import api, { updateProfile as apiUpdateProfile } from "../services/api";
 
 const AuthContext = createContext();
 

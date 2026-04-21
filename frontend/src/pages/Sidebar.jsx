@@ -1,6 +1,6 @@
 // src/pages/Sidebar.jsx
 import React, { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import ProfilePanel from "../pages/ProfilePanel";
 
@@ -9,9 +9,11 @@ export default function Sidebar({ users, selected, setSelected, theme, toggleThe
   const [showProfile, setShowProfile] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const nav = useNavigate();
+  const location = useLocation();
 
   const avatarUrl = user?.avatar_url || user?.profile?.avatar_url || null;
   const displayName = user?.display_name || user?.profile?.display_name || user?.username;
+  const profileIdentifier = user?.username || user?.id;
 
   // helper to get display name for any user object `u`
   const getDisplayName = (u) => u?.display_name || u?.profile?.display_name || u?.username || "Unknown";
@@ -70,9 +72,33 @@ export default function Sidebar({ users, selected, setSelected, theme, toggleThe
           </div>
         </div>
 
-        <button className="btn btn-secondary small" style={{ marginLeft: "auto" }} onClick={() => nav("/friends")}>
-          Friends
-        </button>
+        <div className="sidebar-quick-nav">
+          <button
+            className={`btn btn-secondary small ${location.pathname.startsWith("/chat") ? "active" : ""}`}
+            onClick={() => nav("/chat")}
+          >
+            Chats
+          </button>
+          <button
+            className={`btn btn-secondary small ${location.pathname.startsWith("/feed") ? "active" : ""}`}
+            onClick={() => nav("/feed")}
+          >
+            Feed
+          </button>
+          <button
+            className={`btn btn-secondary small ${location.pathname.startsWith("/friends") ? "active" : ""}`}
+            onClick={() => nav("/friends")}
+          >
+            Friends
+          </button>
+          <button
+            className={`btn btn-secondary small ${location.pathname.startsWith("/profile/") ? "active" : ""}`}
+            onClick={() => profileIdentifier && nav(`/profile/${profileIdentifier}`)}
+            disabled={!profileIdentifier}
+          >
+            Profile
+          </button>
+        </div>
       </div>
 
       {/* Profile panel (overlay) */}
