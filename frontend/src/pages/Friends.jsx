@@ -138,7 +138,7 @@ export default function Friends() {
               </div>
               <div className="friends-actions">
                 <FollowButton
-                  identifier={u.username || u.id}
+                  identifier={u.id}
                   isFollowing={!!u.is_following}
                   onChange={(nextFollowing) => handleFollowChanged(u.id, nextFollowing)}
                 />

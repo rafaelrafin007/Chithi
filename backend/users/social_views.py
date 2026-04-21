@@ -30,7 +30,10 @@ def _get_user_by_identifier(identifier):
 
 
 def _annotated_posts_queryset(user, queryset):
-    liked_by_me_qs = PostLike.objects.filter(post=OuterRef("pk"), user=user)
+    if user and user.is_authenticated:
+        liked_by_me_qs = PostLike.objects.filter(post=OuterRef("pk"), user_id=user.id)
+    else:
+        liked_by_me_qs = PostLike.objects.none()
     return (
         queryset.select_related("author", "author__profile")
         .prefetch_related("media")
@@ -188,16 +191,7 @@ class ProfilePostsView(APIView):
 
     def get(self, request, identifier):
         target = _get_user_by_identifier(identifier)
-        queryset = Post.objects.filter(author=target, is_deleted=False)
-
-        if target.id != request.user.id:
-            is_follower = Follow.objects.filter(follower=request.user, following=target).exists()
-            if is_follower:
-                queryset = queryset.filter(
-                    visibility__in=[Post.VISIBILITY_PUBLIC, Post.VISIBILITY_FOLLOWERS_ONLY]
-                )
-            else:
-                queryset = queryset.filter(visibility=Post.VISIBILITY_PUBLIC)
+        queryset = _visible_posts_queryset_for_user(request.user).filter(author=target)
 
         queryset = _annotated_posts_queryset(request.user, queryset)
         paginator = self.pagination_class()
