@@ -3,7 +3,7 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from .models import Follow, Post, PostLike, Comment
+from .models import Block, Follow, Notification, Post, PostLike, Comment, Report
 from .social_realtime import recipient_user_ids_for_post
 
 User = get_user_model()
@@ -339,13 +339,14 @@ class SocialRealtimeAudienceTests(APITestCase):
         self.charlie = User.objects.create_user(username="charlie_rt", password="pass12345")
         Follow.objects.create(follower=self.bob, following=self.alice)
 
-    def test_public_post_recipient_ids_is_none_for_global_broadcast(self):
+    def test_public_post_recipient_ids_include_visible_users(self):
         post = Post.objects.create(
             author=self.alice,
             content="Public realtime test",
             visibility=Post.VISIBILITY_PUBLIC,
         )
-        self.assertIsNone(recipient_user_ids_for_post(post))
+        recipients = recipient_user_ids_for_post(post)
+        self.assertEqual(recipients, {self.alice.id, self.bob.id, self.charlie.id})
 
     def test_followers_only_recipient_ids_include_author_and_followers(self):
         post = Post.objects.create(
@@ -365,3 +366,131 @@ class SocialRealtimeAudienceTests(APITestCase):
         )
         recipients = recipient_user_ids_for_post(post)
         self.assertEqual(recipients, {self.alice.id})
+
+
+class SocialNotificationAndSafetyTests(APITestCase):
+    def setUp(self):
+        self.alice = User.objects.create_user(username="alice_ns", password="pass12345")
+        self.bob = User.objects.create_user(username="bob_ns", password="pass12345")
+        self.charlie = User.objects.create_user(username="charlie_ns", password="pass12345")
+
+    def _auth(self, user):
+        self.client.force_authenticate(user=user)
+
+    def test_follow_creates_notification(self):
+        self._auth(self.bob)
+        response = self.client.post(f"/api/social/profiles/{self.alice.id}/follow/", {}, format="json")
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        notif = Notification.objects.filter(recipient=self.alice, actor=self.bob, type=Notification.TYPE_FOLLOW).first()
+        self.assertIsNotNone(notif)
+
+    def test_like_creates_notification(self):
+        post = Post.objects.create(author=self.alice, content="Like me", visibility=Post.VISIBILITY_PUBLIC)
+        self._auth(self.bob)
+        response = self.client.post(f"/api/social/posts/{post.id}/like/", {}, format="json")
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        notif = Notification.objects.filter(
+            recipient=self.alice,
+            actor=self.bob,
+            type=Notification.TYPE_POST_LIKE,
+            target_post=post,
+        ).first()
+        self.assertIsNotNone(notif)
+
+    def test_comment_creates_notification(self):
+        post = Post.objects.create(author=self.alice, content="Comment me", visibility=Post.VISIBILITY_PUBLIC)
+        self._auth(self.bob)
+        response = self.client.post(
+            f"/api/social/posts/{post.id}/comments/",
+            {"content": "Hi"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        notif = Notification.objects.filter(
+            recipient=self.alice,
+            actor=self.bob,
+            type=Notification.TYPE_POST_COMMENT,
+            target_post=post,
+        ).first()
+        self.assertIsNotNone(notif)
+
+    def test_self_notification_is_not_created(self):
+        post = Post.objects.create(author=self.alice, content="Own post", visibility=Post.VISIBILITY_PUBLIC)
+        self._auth(self.alice)
+        response = self.client.post(f"/api/social/posts/{post.id}/like/", {}, format="json")
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertFalse(Notification.objects.filter(recipient=self.alice).exists())
+
+    def test_block_prevents_follow(self):
+        Block.objects.create(blocker=self.alice, blocked=self.bob)
+        self._auth(self.bob)
+        response = self.client.post(f"/api/social/profiles/{self.alice.id}/follow/", {}, format="json")
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertFalse(Follow.objects.filter(follower=self.bob, following=self.alice).exists())
+
+    def test_block_prevents_like_and_comment(self):
+        Block.objects.create(blocker=self.alice, blocked=self.bob)
+        post = Post.objects.create(author=self.alice, content="Blocked post", visibility=Post.VISIBILITY_PUBLIC)
+        self._auth(self.bob)
+        like_resp = self.client.post(f"/api/social/posts/{post.id}/like/", {}, format="json")
+        comment_resp = self.client.post(
+            f"/api/social/posts/{post.id}/comments/",
+            {"content": "Should not work"},
+            format="json",
+        )
+        self.assertIn(like_resp.status_code, (status.HTTP_403_FORBIDDEN, status.HTTP_404_NOT_FOUND))
+        self.assertIn(comment_resp.status_code, (status.HTTP_403_FORBIDDEN, status.HTTP_404_NOT_FOUND))
+        self.assertFalse(PostLike.objects.filter(user=self.bob, post=post).exists())
+        self.assertFalse(Comment.objects.filter(author=self.bob, post=post).exists())
+
+    def test_block_hides_posts_from_feed(self):
+        Block.objects.create(blocker=self.alice, blocked=self.bob)
+        post = Post.objects.create(author=self.alice, content="Hidden post", visibility=Post.VISIBILITY_PUBLIC)
+        self._auth(self.bob)
+        response = self.client.get("/api/social/feed/")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        ids = [item["id"] for item in response.data["results"]]
+        self.assertNotIn(post.id, ids)
+
+    def test_report_endpoints_create_reports(self):
+        post = Post.objects.create(author=self.alice, content="Reportable", visibility=Post.VISIBILITY_PUBLIC)
+        self._auth(self.bob)
+        report_user = self.client.post(
+            f"/api/social/reports/users/{self.alice.id}/",
+            {"reason": "abuse", "details": "spam profile"},
+            format="json",
+        )
+        report_post = self.client.post(
+            f"/api/social/reports/posts/{post.id}/",
+            {"reason": "spam", "details": "spam post"},
+            format="json",
+        )
+        self.assertEqual(report_user.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(report_post.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(Report.objects.filter(reporter=self.bob).count(), 2)
+
+    def test_notifications_list_returns_only_current_user_notifications(self):
+        Notification.objects.create(recipient=self.alice, actor=self.bob, type=Notification.TYPE_FOLLOW)
+        Notification.objects.create(recipient=self.bob, actor=self.alice, type=Notification.TYPE_FOLLOW)
+        self._auth(self.alice)
+        response = self.client.get("/api/social/notifications/")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        results = response.data["results"]
+        self.assertEqual(len(results), 1)
+        self.assertEqual(results[0]["actor"]["id"], self.bob.id)
+
+    def test_mark_one_notification_as_read(self):
+        notif = Notification.objects.create(recipient=self.alice, actor=self.bob, type=Notification.TYPE_FOLLOW)
+        self._auth(self.alice)
+        response = self.client.post(f"/api/social/notifications/{notif.id}/read/", {}, format="json")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        notif.refresh_from_db()
+        self.assertTrue(notif.is_read)
+
+    def test_mark_all_notifications_as_read(self):
+        Notification.objects.create(recipient=self.alice, actor=self.bob, type=Notification.TYPE_FOLLOW)
+        Notification.objects.create(recipient=self.alice, actor=self.charlie, type=Notification.TYPE_FOLLOW)
+        self._auth(self.alice)
+        response = self.client.post("/api/social/notifications/read-all/", {}, format="json")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(Notification.objects.filter(recipient=self.alice, is_read=True).count(), 2)

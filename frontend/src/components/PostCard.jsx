@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { deletePost, editPost, likePost, unlikePost } from "../services/api";
+import { deletePost, editPost, likePost, reportPost, unlikePost } from "../services/api";
 import CommentSection from "./CommentSection";
 
 function formatPostTime(timestamp) {
@@ -31,6 +31,8 @@ export default function PostCard({
   const [editText, setEditText] = useState(post?.content || "");
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isReporting, setIsReporting] = useState(false);
+  const [reportMessage, setReportMessage] = useState("");
   const [error, setError] = useState("");
 
   const mine = post?.author?.id === currentUserId;
@@ -93,6 +95,24 @@ export default function PostCard({
     } catch (err) {
       setError(err?.response?.data?.detail || "Could not delete post.");
       setIsDeleting(false);
+    }
+  };
+
+  const handleReport = async () => {
+    if (mine || isReporting) return;
+    const reason = window.prompt("Reason for report (e.g. spam, abuse)", "spam");
+    if (!reason) return;
+    const details = window.prompt("Additional details (optional)", "") || "";
+    setIsReporting(true);
+    setError("");
+    setReportMessage("");
+    try {
+      await reportPost(post.id, { reason, details });
+      setReportMessage("Post reported.");
+    } catch (err) {
+      setError(err?.response?.data?.detail || "Could not report post.");
+    } finally {
+      setIsReporting(false);
     }
   };
 
@@ -175,9 +195,15 @@ export default function PostCard({
             </button>
           </>
         )}
+        {!mine && (
+          <button type="button" className="social-link-btn danger" onClick={handleReport} disabled={isReporting}>
+            {isReporting ? "Reporting..." : "Report post"}
+          </button>
+        )}
       </div>
 
       {error && <div className="social-inline-error">{error}</div>}
+      {reportMessage && <div className="social-inline-success">{reportMessage}</div>}
 
       {showComments && (
         <CommentSection

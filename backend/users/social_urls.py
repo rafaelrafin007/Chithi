@@ -13,6 +13,13 @@ from .social_views import (
     UnlikePostView,
     CommentListCreateView,
     CommentDetailView,
+    NotificationListView,
+    NotificationMarkReadView,
+    NotificationMarkAllReadView,
+    BlockListView,
+    BlockUserView,
+    ReportUserView,
+    ReportPostView,
 )
 
 urlpatterns = [
@@ -32,4 +39,14 @@ urlpatterns = [
     # Comments
     path("posts/<int:post_id>/comments/", CommentListCreateView.as_view(), name="social-comment-list-create"),
     path("comments/<int:comment_id>/", CommentDetailView.as_view(), name="social-comment-detail"),
+    # Notifications
+    path("notifications/", NotificationListView.as_view(), name="social-notification-list"),
+    path("notifications/<int:notification_id>/read/", NotificationMarkReadView.as_view(), name="social-notification-read"),
+    path("notifications/read-all/", NotificationMarkAllReadView.as_view(), name="social-notification-read-all"),
+    # Safety: blocks
+    path("blocks/", BlockListView.as_view(), name="social-block-list"),
+    path("blocks/<str:identifier>/", BlockUserView.as_view(), name="social-block-user"),
+    # Safety: reports
+    path("reports/users/<str:identifier>/", ReportUserView.as_view(), name="social-report-user"),
+    path("reports/posts/<int:post_id>/", ReportPostView.as_view(), name="social-report-post"),
 ]

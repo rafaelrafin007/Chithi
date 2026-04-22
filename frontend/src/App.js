@@ -7,6 +7,7 @@ import Register from "./pages/Register";
 import ChatPage from "./pages/ChatPage";
 import Friends from "./pages/Friends";
 import FeedPage from "./pages/FeedPage";
+import NotificationPage from "./pages/NotificationPage";
 import ProfilePage from "./pages/ProfilePage";
 
 
@@ -23,6 +24,15 @@ export default function App() {
             element={
               <ProtectedRoute>
                 <FeedPage />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/notifications"
+            element={
+              <ProtectedRoute>
+                <NotificationPage />
               </ProtectedRoute>
             }
           />

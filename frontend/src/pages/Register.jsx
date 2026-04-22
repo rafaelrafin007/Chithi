@@ -14,15 +14,15 @@ export default function Register() {
       setErr("");
       await register(form);
       nav("/feed");
-    } catch {
-      setErr("Registration failed");
+    } catch (errorMessage) {
+      setErr(typeof errorMessage === "string" ? errorMessage : "Registration failed");
     }
   };
 
   return (
     <div style={{ maxWidth: 360, margin: "64px auto", textAlign: "center", fontSize: "20px" }}>
       <h2>Sign Up</h2>
-      {err && <p style={{ color: "tomato" }}>{err}</p>}
+      {err && <p style={{ color: "tomato", whiteSpace: "pre-wrap" }}>{err}</p>}
       <form onSubmit={submit}>
         <input
           placeholder="Username"

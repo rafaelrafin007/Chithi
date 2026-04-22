@@ -1313,6 +1313,10 @@ body.dark-theme .edit-icon{color:#fff;}
   cursor: not-allowed;
 }
 
+.social-action-btn.secondary {
+  background: rgba(255, 255, 255, 0.08);
+}
+
 .social-state {
   padding: 20px;
   text-align: center;
@@ -1509,6 +1513,12 @@ body.dark-theme .edit-icon{color:#fff;}
   white-space: pre-wrap;
 }
 
+.social-inline-success {
+  margin-top: 8px;
+  color: #95eab4;
+  font-size: 0.88rem;
+}
+
 .social-load-btn {
   border: 1px solid rgba(255, 255, 255, 0.15);
   border-radius: 10px;
@@ -1564,6 +1574,11 @@ body.dark-theme .edit-icon{color:#fff;}
   min-width: 180px;
 }
 
+.profile-safety-actions {
+  display: grid;
+  gap: 8px;
+}
+
 .profile-counts {
   display: flex;
   gap: 12px;
@@ -1595,6 +1610,48 @@ body.dark-theme .edit-icon{color:#fff;}
   flex-wrap: wrap;
 }
 
+.notification-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.notification-unread {
+  font-size: 0.9rem;
+  opacity: 0.8;
+}
+
+.notification-card {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+}
+
+.notification-card.unread {
+  border-color: rgba(123, 162, 255, 0.58);
+  background: rgba(74, 98, 162, 0.2);
+}
+
+.notification-actor-link {
+  border: none;
+  background: transparent;
+  color: inherit;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.notification-actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
 body.light-theme .social-page {
   background:
     radial-gradient(900px 320px at 0% -10%, rgba(72, 131, 220, 0.2), transparent 65%),
@@ -1612,6 +1669,11 @@ body.light-theme .social-nav-btn {
   color: #1f2937;
   border-color: rgba(17, 24, 39, 0.2);
   background: rgba(17, 24, 39, 0.04);
+}
+
+body.light-theme .social-action-btn.secondary {
+  background: rgba(17, 24, 39, 0.08);
+  color: #1f2937;
 }
 
 body.light-theme .social-textarea,
@@ -1637,6 +1699,11 @@ body.light-theme .comment-time {
 body.light-theme .comment-item {
   background: rgba(17, 24, 39, 0.02);
   border-color: rgba(17, 24, 39, 0.08);
+}
+
+body.light-theme .notification-card.unread {
+  border-color: rgba(51, 106, 198, 0.42);
+  background: rgba(51, 106, 198, 0.08);
 }
 
 @media (max-width: 760px) {

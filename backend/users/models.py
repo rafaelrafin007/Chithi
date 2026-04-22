@@ -90,6 +90,41 @@ class Follow(models.Model):
         return f"{self.follower_id} -> {self.following_id}"
 
 
+class Block(models.Model):
+    blocker = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        related_name="blocks_initiated",
+        on_delete=models.CASCADE,
+    )
+    blocked = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        related_name="blocks_received",
+        on_delete=models.CASCADE,
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=["blocker", "blocked"], name="unique_block_relation"),
+            models.CheckConstraint(check=~models.Q(blocker=models.F("blocked")), name="prevent_self_block"),
+        ]
+        indexes = [
+            models.Index(fields=["blocker", "created_at"]),
+            models.Index(fields=["blocked", "created_at"]),
+        ]
+
+    def clean(self):
+        if self.blocker_id and self.blocked_id and self.blocker_id == self.blocked_id:
+            raise ValidationError({"blocked": "You cannot block yourself."})
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        return super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"{self.blocker_id} blocked {self.blocked_id}"
+
+
 class Post(models.Model):
     VISIBILITY_PUBLIC = "public"
     VISIBILITY_FOLLOWERS_ONLY = "followers_only"
@@ -193,6 +228,118 @@ class Comment(models.Model):
         return f"Comment {self.id} on post {self.post_id}"
 
 
+class Notification(models.Model):
+    TYPE_FOLLOW = "follow"
+    TYPE_POST_LIKE = "post_like"
+    TYPE_POST_COMMENT = "post_comment"
+
+    TYPE_CHOICES = [
+        (TYPE_FOLLOW, "Follow"),
+        (TYPE_POST_LIKE, "Post Like"),
+        (TYPE_POST_COMMENT, "Post Comment"),
+    ]
+
+    recipient = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        related_name="notifications_received",
+        on_delete=models.CASCADE,
+    )
+    actor = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        related_name="notifications_sent",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+    )
+    type = models.CharField(max_length=20, choices=TYPE_CHOICES)
+    target_post = models.ForeignKey(
+        Post,
+        related_name="notifications",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+    )
+    target_comment = models.ForeignKey(
+        Comment,
+        related_name="notifications",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+    )
+    is_read = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["recipient", "is_read", "created_at"]),
+            models.Index(fields=["type", "created_at"]),
+        ]
+
+    def __str__(self):
+        return f"Notification {self.id} -> user {self.recipient_id}"
+
+
+class Report(models.Model):
+    STATUS_OPEN = "open"
+    STATUS_REVIEWED = "reviewed"
+    STATUS_DISMISSED = "dismissed"
+
+    STATUS_CHOICES = [
+        (STATUS_OPEN, "Open"),
+        (STATUS_REVIEWED, "Reviewed"),
+        (STATUS_DISMISSED, "Dismissed"),
+    ]
+
+    reporter = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        related_name="reports_created",
+        on_delete=models.CASCADE,
+    )
+    target_user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        related_name="reports_received",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+    )
+    target_post = models.ForeignKey(
+        Post,
+        related_name="reports",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+    )
+    reason = models.CharField(max_length=64)
+    details = models.TextField(blank=True)
+    status = models.CharField(max_length=16, choices=STATUS_CHOICES, default=STATUS_OPEN)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["reporter", "created_at"]),
+            models.Index(fields=["status", "created_at"]),
+        ]
+
+    def clean(self):
+        has_user = bool(self.target_user_id)
+        has_post = bool(self.target_post_id)
+        if has_user == has_post:
+            raise ValidationError("Report must target exactly one of user or post.")
+        if not (self.reason or "").strip():
+            raise ValidationError({"reason": "Reason is required."})
+        if self.target_user_id and self.reporter_id and self.target_user_id == self.reporter_id:
+            raise ValidationError({"target_user": "You cannot report yourself."})
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        return super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"Report {self.id} by {self.reporter_id}"
+
+
 def are_friends(user_a, user_b):
     if not user_a or not user_b:
         return False
@@ -200,4 +347,14 @@ def are_friends(user_a, user_b):
         status=FriendRequest.STATUS_ACCEPTED,
         from_user__in=[user_a, user_b],
         to_user__in=[user_a, user_b],
+    ).exists()
+
+
+def is_blocked_between(user_a, user_b):
+    if not user_a or not user_b:
+        return False
+    if getattr(user_a, "id", None) == getattr(user_b, "id", None):
+        return False
+    return Block.objects.filter(
+        models.Q(blocker=user_a, blocked=user_b) | models.Q(blocker=user_b, blocked=user_a)
     ).exists()

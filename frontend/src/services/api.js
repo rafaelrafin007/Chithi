@@ -98,6 +98,15 @@ export const socialApi = {
   deleteComment: (commentId) => api.delete(`${SOCIAL_BASE}/comments/${commentId}/`),
   editPost: (postId, payload) => api.patch(`${SOCIAL_BASE}/posts/${postId}/`, payload),
   deletePost: (postId) => api.delete(`${SOCIAL_BASE}/posts/${postId}/`),
+  getNotifications: (params = {}) => api.get(`${SOCIAL_BASE}/notifications/`, { params }),
+  markNotificationRead: (notificationId) =>
+    api.post(`${SOCIAL_BASE}/notifications/${notificationId}/read/`),
+  markAllNotificationsRead: () => api.post(`${SOCIAL_BASE}/notifications/read-all/`),
+  getBlockedUsers: (params = {}) => api.get(`${SOCIAL_BASE}/blocks/`, { params }),
+  blockUser: (identifier) => api.post(`${SOCIAL_BASE}/blocks/${identifier}/`),
+  unblockUser: (identifier) => api.delete(`${SOCIAL_BASE}/blocks/${identifier}/`),
+  reportUser: (identifier, payload) => api.post(`${SOCIAL_BASE}/reports/users/${identifier}/`, payload),
+  reportPost: (postId, payload) => api.post(`${SOCIAL_BASE}/reports/posts/${postId}/`, payload),
 };
 
 export const getFeed = socialApi.getFeed;
@@ -114,6 +123,14 @@ export const editComment = socialApi.editComment;
 export const deleteComment = socialApi.deleteComment;
 export const editPost = socialApi.editPost;
 export const deletePost = socialApi.deletePost;
+export const getNotifications = socialApi.getNotifications;
+export const markNotificationRead = socialApi.markNotificationRead;
+export const markAllNotificationsRead = socialApi.markAllNotificationsRead;
+export const getBlockedUsers = socialApi.getBlockedUsers;
+export const blockUser = socialApi.blockUser;
+export const unblockUser = socialApi.unblockUser;
+export const reportUser = socialApi.reportUser;
+export const reportPost = socialApi.reportPost;
 
 // ---- Token refresh handling ----
 let isRefreshing = false;

@@ -23,6 +23,24 @@ export function AuthProvider({ children }) {
     };
   };
 
+  const parseAuthError = (err, fallback) => {
+    const data = err?.response?.data;
+    if (!data) return err?.message || fallback;
+    if (typeof data === "string") return data;
+    if (Array.isArray(data)) return data.join(" ");
+    if (data.detail) return data.detail;
+    if (data.non_field_errors) {
+      return Array.isArray(data.non_field_errors) ? data.non_field_errors.join(" ") : String(data.non_field_errors);
+    }
+    const messages = Object.entries(data)
+      .map(([field, value]) => {
+        const text = Array.isArray(value) ? value.join(" ") : String(value);
+        return `${field}: ${text}`;
+      })
+      .join("\n");
+    return messages || fallback;
+  };
+
   // Login accepts { username, password, email } (username field may contain an email)
   const login = async ({ username, password, email } = {}) => {
     try {
@@ -40,14 +58,7 @@ export function AuthProvider({ children }) {
       setUser(normalizeUser(me.data));
       return me.data;
     } catch (err) {
-      const serverMessage =
-        err?.response?.data ||
-        err?.response?.data?.detail ||
-        err?.response?.data?.non_field_errors ||
-        err?.response?.data?.message ||
-        err?.message ||
-        "Login failed";
-      throw serverMessage;
+      throw parseAuthError(err, "Login failed");
     }
   };
 
@@ -62,14 +73,7 @@ export function AuthProvider({ children }) {
       await login({ username, password });
       return data;
     } catch (err) {
-      const serverMessage =
-        err?.response?.data ||
-        err?.response?.data?.detail ||
-        err?.response?.data?.non_field_errors ||
-        err?.response?.data?.message ||
-        err?.message ||
-        "Registration failed";
-      throw serverMessage;
+      throw parseAuthError(err, "Registration failed");
     }
   };
 
@@ -110,14 +114,7 @@ export function AuthProvider({ children }) {
       setUser(normalizeUser(updated));
       return updated;
     } catch (err) {
-      const serverMessage =
-        err?.response?.data ||
-        err?.response?.data?.detail ||
-        err?.response?.data?.non_field_errors ||
-        err?.response?.data?.message ||
-        err?.message ||
-        "Failed to update profile";
-      throw serverMessage;
+      throw parseAuthError(err, "Failed to update profile");
     }
   };
 

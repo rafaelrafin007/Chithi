@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-import { getProfilePosts, getSocialProfile } from "../services/api";
+import { blockUser, getProfilePosts, getSocialProfile, reportUser, unblockUser } from "../services/api";
 import SocialNav from "../components/SocialNav";
 import FollowButton from "../components/FollowButton";
 import PostCard from "../components/PostCard";
@@ -28,6 +28,10 @@ export default function ProfilePage() {
   const [error, setError] = useState("");
   const [nextPage, setNextPage] = useState(null);
   const [showEditor, setShowEditor] = useState(false);
+  const [blockLoading, setBlockLoading] = useState(false);
+  const [blockError, setBlockError] = useState("");
+  const [reporting, setReporting] = useState(false);
+  const [reportMessage, setReportMessage] = useState("");
 
   useEffect(() => {
     const theme = localStorage.getItem("theme") || "dark";
@@ -96,6 +100,56 @@ export default function ProfilePage() {
 
   const handlePostRemoved = (postId) => {
     setPosts((prev) => prev.filter((item) => item.id !== postId));
+  };
+
+  const handleBlockToggle = async () => {
+    if (!profile || blockLoading) return;
+    const targetIdentifier = profile.username || profile.id;
+    setBlockLoading(true);
+    setBlockError("");
+    setReportMessage("");
+    try {
+      if (profile.is_blocked_by_me) {
+        await unblockUser(targetIdentifier);
+        setProfile((prev) => (prev ? { ...prev, is_blocked_by_me: false } : prev));
+      } else {
+        await blockUser(targetIdentifier);
+        setProfile((prev) =>
+          prev
+            ? {
+                ...prev,
+                is_blocked_by_me: true,
+                is_following: false,
+              }
+            : prev
+        );
+        setPosts([]);
+        setNextPage(null);
+      }
+    } catch (err) {
+      setBlockError(err?.response?.data?.detail || "Unable to update block status.");
+    } finally {
+      setBlockLoading(false);
+    }
+  };
+
+  const handleReportUser = async () => {
+    if (!profile || reporting) return;
+    const reason = window.prompt("Reason for report (e.g. spam, abuse)", "abuse");
+    if (!reason) return;
+    const details = window.prompt("Additional details (optional)", "") || "";
+    setReporting(true);
+    setBlockError("");
+    setReportMessage("");
+    try {
+      const targetIdentifier = profile.username || profile.id;
+      await reportUser(targetIdentifier, { reason, details });
+      setReportMessage("Report submitted.");
+    } catch (err) {
+      setBlockError(err?.response?.data?.detail || "Unable to submit report.");
+    } finally {
+      setReporting(false);
+    }
   };
 
   const handleRealtimeEvent = useCallback(
@@ -233,11 +287,24 @@ export default function ProfilePage() {
                   Edit profile
                 </button>
               ) : (
-                <FollowButton
-                  identifier={identifier}
-                  isFollowing={!!profile.is_following}
-                  onChange={handleFollowChange}
-                />
+                <div className="profile-safety-actions">
+                  {!profile.is_blocked_by_me && !profile.has_blocked_me && (
+                    <FollowButton
+                      identifier={identifier}
+                      isFollowing={!!profile.is_following}
+                      onChange={handleFollowChange}
+                    />
+                  )}
+                  <button type="button" className="social-action-btn secondary" onClick={handleBlockToggle} disabled={blockLoading}>
+                    {blockLoading ? "Please wait..." : profile.is_blocked_by_me ? "Unblock" : "Block"}
+                  </button>
+                  <button type="button" className="social-link-btn" onClick={handleReportUser} disabled={reporting}>
+                    {reporting ? "Reporting..." : "Report user"}
+                  </button>
+                  {profile.has_blocked_me && <div className="social-inline-error">You are blocked by this user.</div>}
+                  {blockError && <div className="social-inline-error">{blockError}</div>}
+                  {reportMessage && <div className="social-inline-success">{reportMessage}</div>}
+                </div>
               )}
             </div>
           </section>
@@ -245,6 +312,8 @@ export default function ProfilePage() {
 
         {loadingPosts ? (
           <div className="social-state">Loading posts...</div>
+        ) : error && posts.length === 0 ? (
+          <div className="social-state">{error}</div>
         ) : posts.length === 0 ? (
           <div className="social-state">No posts to show.</div>
         ) : (

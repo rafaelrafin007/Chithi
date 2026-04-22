@@ -8,7 +8,7 @@ from rest_framework.parsers import JSONParser, FormParser, MultiPartParser
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from .models import Follow, Post, PostMedia, PostLike, Comment
+from .models import Block, Follow, Post, PostMedia, PostLike, Comment, Notification, Report, is_blocked_between
 from .pagination import StandardPagination
 from .permissions import IsPostOwnerOrReadOnly, IsCommentOwnerOrReadOnly
 from .serializers import UserSimpleSerializer
@@ -18,6 +18,9 @@ from .social_serializers import (
     PostWriteSerializer,
     CommentReadSerializer,
     CommentWriteSerializer,
+    NotificationReadSerializer,
+    ReportWriteSerializer,
+    BlockReadSerializer,
 )
 from .social_realtime import (
     broadcast_event_for_post,
@@ -54,10 +57,36 @@ def _annotated_posts_queryset(user, queryset):
     )
 
 
+def _is_blocked_between_users(user_a, user_b):
+    return is_blocked_between(user_a, user_b)
+
+
+def _create_notification_if_applicable(recipient, actor, notification_type, target_post=None, target_comment=None):
+    if not recipient or not actor:
+        return
+    if recipient.id == actor.id:
+        return
+    Notification.objects.create(
+        recipient=recipient,
+        actor=actor,
+        type=notification_type,
+        target_post=target_post,
+        target_comment=target_comment,
+    )
+
+
 def _visible_posts_queryset_for_user(user):
     follow_exists = Follow.objects.filter(follower=user, following=OuterRef("author_id"))
-    base = Post.objects.filter(is_deleted=False).annotate(_follows_author=Exists(follow_exists))
+    blocked_exists = Block.objects.filter(
+        Q(blocker=user, blocked=OuterRef("author_id")) | Q(blocked=user, blocker=OuterRef("author_id"))
+    )
+    base = Post.objects.filter(is_deleted=False).annotate(
+        _follows_author=Exists(follow_exists),
+        _is_blocked_author=Exists(blocked_exists),
+    )
     return base.filter(
+        _is_blocked_author=False
+    ).filter(
         Q(author=user)
         | Q(visibility=Post.VISIBILITY_PUBLIC)
         | Q(visibility=Post.VISIBILITY_FOLLOWERS_ONLY, _follows_author=True)
@@ -74,11 +103,15 @@ class PublicProfileView(APIView):
 
     def get(self, request, identifier):
         following_exists = Follow.objects.filter(follower=request.user, following=OuterRef("pk"))
+        blocked_by_me_exists = Block.objects.filter(blocker=request.user, blocked=OuterRef("pk"))
+        has_blocked_me_exists = Block.objects.filter(blocker=OuterRef("pk"), blocked=request.user)
         base_queryset = User.objects.select_related("profile").annotate(
             followers_count=Count("follower_relations", distinct=True),
             following_count=Count("following_relations", distinct=True),
             posts_count=Count("posts", filter=Q(posts__is_deleted=False), distinct=True),
             is_following=Exists(following_exists),
+            is_blocked_by_me=Exists(blocked_by_me_exists),
+            has_blocked_me=Exists(has_blocked_me_exists),
         )
         if str(identifier).isdigit():
             target = base_queryset.filter(pk=int(identifier)).first()
@@ -97,12 +130,19 @@ class FollowUserView(APIView):
         target = _get_user_by_identifier(identifier)
         if target.id == request.user.id:
             return Response({"detail": "You cannot follow yourself."}, status=400)
+        if _is_blocked_between_users(request.user, target):
+            return Response({"detail": "Follow is not allowed because one user has blocked the other."}, status=403)
         try:
             Follow.objects.create(follower=request.user, following=target)
         except DjangoValidationError as exc:
             return Response({"detail": exc.message_dict if hasattr(exc, "message_dict") else str(exc)}, status=400)
         except IntegrityError:
             return Response({"detail": "You already follow this user."}, status=400)
+        _create_notification_if_applicable(
+            recipient=target,
+            actor=request.user,
+            notification_type=Notification.TYPE_FOLLOW,
+        )
         return Response({"detail": "Followed successfully."}, status=201)
 
 
@@ -123,6 +163,8 @@ class FollowersListView(APIView):
 
     def get(self, request, identifier):
         target = _get_user_by_identifier(identifier)
+        if _is_blocked_between_users(request.user, target):
+            return Response({"detail": "Followers are unavailable for blocked users."}, status=403)
         users = User.objects.filter(following_relations__following=target).select_related("profile").order_by(
             "-following_relations__created_at"
         )
@@ -138,6 +180,8 @@ class FollowingListView(APIView):
 
     def get(self, request, identifier):
         target = _get_user_by_identifier(identifier)
+        if _is_blocked_between_users(request.user, target):
+            return Response({"detail": "Following list is unavailable for blocked users."}, status=403)
         users = User.objects.filter(follower_relations__follower=target).select_related("profile").order_by(
             "-follower_relations__created_at"
         )
@@ -211,6 +255,8 @@ class ProfilePostsView(APIView):
 
     def get(self, request, identifier):
         target = _get_user_by_identifier(identifier)
+        if _is_blocked_between_users(request.user, target):
+            return Response({"detail": "Posts are unavailable for blocked users."}, status=403)
         queryset = _visible_posts_queryset_for_user(request.user).filter(author=target)
 
         queryset = _annotated_posts_queryset(request.user, queryset)
@@ -292,14 +338,16 @@ class LikePostView(APIView):
 
     def post(self, request, post_id):
         post = _get_visible_post_or_404(request.user, post_id)
+        if _is_blocked_between_users(request.user, post.author):
+            return Response({"detail": "You cannot like posts from blocked users."}, status=403)
         try:
             with transaction.atomic():
                 PostLike.objects.create(user=request.user, post=post)
         except IntegrityError:
             return Response({"detail": "Post already liked."}, status=400)
 
-        transaction.on_commit(
-            lambda: broadcast_event_for_post(
+        def _after_like():
+            broadcast_event_for_post(
                 post,
                 {
                     "event": "post_liked",
@@ -308,6 +356,13 @@ class LikePostView(APIView):
                     "like_count": like_count_for_post(post.id),
                 },
             )
+
+        transaction.on_commit(_after_like)
+        _create_notification_if_applicable(
+            recipient=post.author,
+            actor=request.user,
+            notification_type=Notification.TYPE_POST_LIKE,
+            target_post=post,
         )
         return Response({"detail": "Post liked."}, status=201)
 
@@ -353,6 +408,8 @@ class CommentListCreateView(APIView):
 
     def post(self, request, post_id):
         post = _get_visible_post_or_404(request.user, post_id)
+        if _is_blocked_between_users(request.user, post.author):
+            return Response({"detail": "You cannot comment on posts from blocked users."}, status=403)
         serializer = CommentWriteSerializer(data=request.data, context={"post": post})
         serializer.is_valid(raise_exception=True)
         comment = Comment.objects.create(
@@ -362,8 +419,9 @@ class CommentListCreateView(APIView):
             parent_comment=serializer.validated_data.get("parent_comment"),
         )
         data = CommentReadSerializer(comment, context={"request": request}).data
-        transaction.on_commit(
-            lambda: broadcast_event_for_post(
+
+        def _after_comment_create():
+            broadcast_event_for_post(
                 post,
                 {
                     "event": "comment_created",
@@ -373,6 +431,14 @@ class CommentListCreateView(APIView):
                     "comment_count": comment_count_for_post(post.id),
                 },
             )
+
+        transaction.on_commit(_after_comment_create)
+        _create_notification_if_applicable(
+            recipient=post.author,
+            actor=request.user,
+            notification_type=Notification.TYPE_POST_COMMENT,
+            target_post=post,
+            target_comment=comment,
         )
         return Response(data, status=201)
 
@@ -447,3 +513,108 @@ class CommentDetailView(generics.RetrieveUpdateDestroyAPIView):
             )
         )
         return Response(status=204)
+
+
+class NotificationListView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+    pagination_class = StandardPagination
+
+    def get(self, request):
+        queryset = Notification.objects.filter(recipient=request.user).select_related(
+            "actor", "actor__profile", "target_post", "target_comment"
+        )
+        paginator = self.pagination_class()
+        page = paginator.paginate_queryset(queryset, request, view=self)
+        data = NotificationReadSerializer(page, many=True, context={"request": request}).data
+        return paginator.get_paginated_response(data)
+
+
+class NotificationMarkReadView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, notification_id):
+        notification = get_object_or_404(Notification, pk=notification_id, recipient=request.user)
+        if not notification.is_read:
+            notification.is_read = True
+            notification.save(update_fields=["is_read"])
+        data = NotificationReadSerializer(notification, context={"request": request}).data
+        return Response(data, status=200)
+
+
+class NotificationMarkAllReadView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        Notification.objects.filter(recipient=request.user, is_read=False).update(is_read=True)
+        return Response({"detail": "All notifications marked as read."}, status=200)
+
+
+class BlockListView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+    pagination_class = StandardPagination
+
+    def get(self, request):
+        queryset = Block.objects.filter(blocker=request.user).select_related("blocked", "blocked__profile")
+        paginator = self.pagination_class()
+        page = paginator.paginate_queryset(queryset, request, view=self)
+        data = BlockReadSerializer(page, many=True, context={"request": request}).data
+        return paginator.get_paginated_response(data)
+
+
+class BlockUserView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, identifier):
+        target = _get_user_by_identifier(identifier)
+        if target.id == request.user.id:
+            return Response({"detail": "You cannot block yourself."}, status=400)
+        try:
+            with transaction.atomic():
+                Block.objects.create(blocker=request.user, blocked=target)
+                Follow.objects.filter(
+                    Q(follower=request.user, following=target) | Q(follower=target, following=request.user)
+                ).delete()
+        except IntegrityError:
+            return Response({"detail": "User is already blocked."}, status=400)
+        return Response({"detail": "User blocked."}, status=201)
+
+    def delete(self, request, identifier):
+        target = _get_user_by_identifier(identifier)
+        deleted, _ = Block.objects.filter(blocker=request.user, blocked=target).delete()
+        if not deleted:
+            return Response({"detail": "User is not blocked."}, status=400)
+        return Response(status=204)
+
+
+class ReportUserView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, identifier):
+        target = _get_user_by_identifier(identifier)
+        if target.id == request.user.id:
+            return Response({"detail": "You cannot report yourself."}, status=400)
+        serializer = ReportWriteSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        report = Report.objects.create(
+            reporter=request.user,
+            target_user=target,
+            reason=serializer.validated_data["reason"],
+            details=serializer.validated_data.get("details", ""),
+        )
+        return Response({"id": report.id, "detail": "Report submitted."}, status=201)
+
+
+class ReportPostView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, post_id):
+        post = get_object_or_404(Post, pk=post_id, is_deleted=False)
+        serializer = ReportWriteSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        report = Report.objects.create(
+            reporter=request.user,
+            target_post=post,
+            reason=serializer.validated_data["reason"],
+            details=serializer.validated_data.get("details", ""),
+        )
+        return Response({"id": report.id, "detail": "Report submitted."}, status=201)

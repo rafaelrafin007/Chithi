@@ -1,7 +1,7 @@
 from django.contrib.auth import get_user_model
 from rest_framework import serializers
 
-from .models import Post, PostMedia, Comment
+from .models import Block, Post, PostMedia, Comment, Notification, Report
 from .serializers import UserSimpleSerializer
 
 User = get_user_model()
@@ -15,6 +15,8 @@ class PublicProfileSerializer(serializers.ModelSerializer):
     following_count = serializers.IntegerField(read_only=True)
     posts_count = serializers.IntegerField(read_only=True)
     is_following = serializers.BooleanField(read_only=True)
+    is_blocked_by_me = serializers.BooleanField(read_only=True)
+    has_blocked_me = serializers.BooleanField(read_only=True)
 
     class Meta:
         model = User
@@ -28,6 +30,8 @@ class PublicProfileSerializer(serializers.ModelSerializer):
             "following_count",
             "posts_count",
             "is_following",
+            "is_blocked_by_me",
+            "has_blocked_me",
         )
 
     def _build_absolute(self, url):
@@ -194,3 +198,41 @@ class CommentReadSerializer(serializers.ModelSerializer):
             "updated_at",
             "is_deleted",
         )
+
+
+class NotificationReadSerializer(serializers.ModelSerializer):
+    actor = UserSimpleSerializer(read_only=True)
+    target_post_id = serializers.IntegerField(source="target_post.id", read_only=True)
+    target_comment_id = serializers.IntegerField(source="target_comment.id", read_only=True)
+
+    class Meta:
+        model = Notification
+        fields = (
+            "id",
+            "type",
+            "is_read",
+            "created_at",
+            "actor",
+            "target_post_id",
+            "target_comment_id",
+        )
+
+
+class ReportWriteSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Report
+        fields = ("reason", "details")
+
+    def validate_reason(self, value):
+        value = (value or "").strip()
+        if not value:
+            raise serializers.ValidationError("Reason is required.")
+        return value
+
+
+class BlockReadSerializer(serializers.ModelSerializer):
+    blocked_user = UserSimpleSerializer(source="blocked", read_only=True)
+
+    class Meta:
+        model = Block
+        fields = ("id", "blocked_user", "created_at")

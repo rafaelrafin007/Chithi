@@ -11,6 +11,7 @@ export default function SocialNav({ className = "" }) {
 
   const links = [
     { key: "feed", label: "Feed", to: "/feed" },
+    { key: "notifications", label: "Notifications", to: "/notifications" },
     { key: "chat", label: "Chats", to: "/chat" },
     { key: "profile", label: "Profile", to: profileIdentifier ? `/profile/${profileIdentifier}` : "/feed" },
   ];
@@ -21,6 +22,8 @@ export default function SocialNav({ className = "" }) {
         const isActive =
           item.key === "feed"
             ? location.pathname.startsWith("/feed")
+            : item.key === "notifications"
+              ? location.pathname.startsWith("/notifications")
             : item.key === "chat"
               ? location.pathname.startsWith("/chat")
               : location.pathname.startsWith("/profile/");
