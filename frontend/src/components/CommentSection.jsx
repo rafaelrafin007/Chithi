@@ -1,5 +1,6 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { createComment, deleteComment, editComment, getComments } from "../services/api";
+import { SOCIAL_REALTIME_EVENT_NAME } from "../hooks/useSocialRealtime";
 
 function normalizePaged(payload) {
   if (Array.isArray(payload)) {
@@ -39,7 +40,7 @@ function formatTime(ts) {
 export default function CommentSection({ postId, currentUserId, initialCount = 0, onCountChange }) {
   const [comments, setComments] = useState([]);
   const [nextPage, setNextPage] = useState(null);
-  const [count, setCount] = useState(initialCount || 0);
+  const [, setCount] = useState(initialCount || 0);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState("");
@@ -48,14 +49,75 @@ export default function CommentSection({ postId, currentUserId, initialCount = 0
   const [editingId, setEditingId] = useState(null);
   const [editingText, setEditingText] = useState("");
 
-  const applyCount = (nextCount) => {
+  const applyCount = useCallback((nextCount) => {
     setCount(nextCount);
     onCountChange?.(nextCount);
-  };
+  }, [onCountChange]);
+
+  const bumpCount = useCallback((delta) => {
+    setCount((prev) => {
+      const next = Math.max(0, prev + delta);
+      onCountChange?.(next);
+      return next;
+    });
+  }, [onCountChange]);
 
   useEffect(() => {
     setCount(initialCount || 0);
   }, [initialCount]);
+
+  useEffect(() => {
+    const handler = (event) => {
+      const payload = event?.detail;
+      if (!payload || payload.post_id !== postId) return;
+
+      if (payload.event === "comment_created" && payload.comment) {
+        setComments((prev) => {
+          const exists = prev.some((item) => item.id === payload.comment.id);
+          if (exists) {
+            return prev.map((item) => (item.id === payload.comment.id ? payload.comment : item));
+          }
+          return [...prev, payload.comment];
+        });
+        if (typeof payload.comment_count === "number") {
+          applyCount(payload.comment_count);
+        }
+        return;
+      }
+
+      if (payload.event === "comment_updated" && payload.comment) {
+        setComments((prev) =>
+          prev.map((item) => (item.id === payload.comment.id ? payload.comment : item))
+        );
+        if (typeof payload.comment_count === "number") {
+          applyCount(payload.comment_count);
+        }
+        return;
+      }
+
+      if (payload.event === "comment_deleted" && (payload.comment || payload.comment_id)) {
+        const targetId = payload.comment?.id || payload.comment_id;
+        setComments((prev) =>
+          prev.map((item) =>
+            item.id === targetId
+              ? {
+                  ...item,
+                  ...(payload.comment || {}),
+                  is_deleted: true,
+                  content: payload.comment?.content || "This comment was deleted",
+                }
+              : item
+          )
+        );
+        if (typeof payload.comment_count === "number") {
+          applyCount(payload.comment_count);
+        }
+      }
+    };
+
+    window.addEventListener(SOCIAL_REALTIME_EVENT_NAME, handler);
+    return () => window.removeEventListener(SOCIAL_REALTIME_EVENT_NAME, handler);
+  }, [applyCount, postId]);
 
   const loadComments = async ({ page = 1, append = false } = {}) => {
     setError("");
@@ -87,9 +149,9 @@ export default function CommentSection({ postId, currentUserId, initialCount = 0
     setError("");
     try {
       const { data } = await createComment(postId, { content, parent_comment: null });
-      setComments((prev) => [...prev, data]);
+      setComments((prev) => (prev.some((item) => item.id === data.id) ? prev : [...prev, data]));
       setDraft("");
-      applyCount(count + 1);
+      bumpCount(1);
     } catch (err) {
       setError(parseError(err, "Failed to add comment."));
     } finally {
@@ -121,7 +183,7 @@ export default function CommentSection({ postId, currentUserId, initialCount = 0
             : item
         )
       );
-      if (existing && !existing.is_deleted) applyCount(Math.max(0, count - 1));
+      if (existing && !existing.is_deleted) bumpCount(-1);
     } catch (err) {
       setError(parseError(err, "Failed to delete comment."));
     }

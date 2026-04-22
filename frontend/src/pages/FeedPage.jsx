@@ -4,6 +4,7 @@ import { useAuth } from "../context/AuthContext";
 import SocialNav from "../components/SocialNav";
 import CreatePostComposer from "../components/CreatePostComposer";
 import PostCard from "../components/PostCard";
+import useSocialRealtime from "../hooks/useSocialRealtime";
 
 function normalizePaged(payload) {
   if (Array.isArray(payload)) {
@@ -63,6 +64,68 @@ export default function FeedPage() {
   const handlePostRemoved = (postId) => {
     setPosts((prev) => prev.filter((item) => item.id !== postId));
   };
+
+  const handleRealtimeEvent = useCallback(
+    (payload) => {
+      const eventName = payload?.event;
+      if (!eventName) return;
+
+      if (eventName === "post_created" && payload.post) {
+        setPosts((prev) => {
+          const exists = prev.some((item) => item.id === payload.post.id);
+          if (exists) {
+            return prev.map((item) => (item.id === payload.post.id ? { ...item, ...payload.post } : item));
+          }
+          return [payload.post, ...prev];
+        });
+        return;
+      }
+
+      if (eventName === "post_updated" && payload.post_id) {
+        setPosts((prev) =>
+          prev.map((item) => (item.id === payload.post_id ? { ...item, ...(payload.post || {}) } : item))
+        );
+        return;
+      }
+
+      if (eventName === "post_deleted" && payload.post_id) {
+        setPosts((prev) => prev.filter((item) => item.id !== payload.post_id));
+        return;
+      }
+
+      if ((eventName === "post_liked" || eventName === "post_unliked") && payload.post_id) {
+        setPosts((prev) =>
+          prev.map((item) => {
+            if (item.id !== payload.post_id) return item;
+            const next = { ...item };
+            if (typeof payload.like_count === "number") {
+              next.like_count = payload.like_count;
+            }
+            if (payload.actor_id && payload.actor_id === user?.id) {
+              next.is_liked_by_me = eventName === "post_liked";
+            }
+            return next;
+          })
+        );
+        return;
+      }
+
+      if (
+        (eventName === "comment_created" || eventName === "comment_updated" || eventName === "comment_deleted") &&
+        payload.post_id &&
+        typeof payload.comment_count === "number"
+      ) {
+        setPosts((prev) =>
+          prev.map((item) =>
+            item.id === payload.post_id ? { ...item, comment_count: payload.comment_count } : item
+          )
+        );
+      }
+    },
+    [user?.id]
+  );
+
+  useSocialRealtime(handleRealtimeEvent, !!user?.id);
 
   const loadMore = async () => {
     if (!nextPage || loadingMore) return;

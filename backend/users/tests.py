@@ -4,6 +4,7 @@ from rest_framework import status
 from rest_framework.test import APITestCase
 
 from .models import Follow, Post, PostLike, Comment
+from .social_realtime import recipient_user_ids_for_post
 
 User = get_user_model()
 
@@ -329,3 +330,38 @@ class AuthRefreshSafetyTests(APITestCase):
 
         response = self.client.post("/api/auth/token/refresh/", {"refresh": refresh}, format="json")
         self.assertIn(response.status_code, (status.HTTP_400_BAD_REQUEST, status.HTTP_401_UNAUTHORIZED))
+
+
+class SocialRealtimeAudienceTests(APITestCase):
+    def setUp(self):
+        self.alice = User.objects.create_user(username="alice_rt", password="pass12345")
+        self.bob = User.objects.create_user(username="bob_rt", password="pass12345")
+        self.charlie = User.objects.create_user(username="charlie_rt", password="pass12345")
+        Follow.objects.create(follower=self.bob, following=self.alice)
+
+    def test_public_post_recipient_ids_is_none_for_global_broadcast(self):
+        post = Post.objects.create(
+            author=self.alice,
+            content="Public realtime test",
+            visibility=Post.VISIBILITY_PUBLIC,
+        )
+        self.assertIsNone(recipient_user_ids_for_post(post))
+
+    def test_followers_only_recipient_ids_include_author_and_followers(self):
+        post = Post.objects.create(
+            author=self.alice,
+            content="Followers-only realtime test",
+            visibility=Post.VISIBILITY_FOLLOWERS_ONLY,
+        )
+        recipients = recipient_user_ids_for_post(post)
+        self.assertEqual(recipients, {self.alice.id, self.bob.id})
+        self.assertNotIn(self.charlie.id, recipients)
+
+    def test_private_post_recipient_ids_include_only_author(self):
+        post = Post.objects.create(
+            author=self.alice,
+            content="Private realtime test",
+            visibility=Post.VISIBILITY_PRIVATE,
+        )
+        recipients = recipient_user_ids_for_post(post)
+        self.assertEqual(recipients, {self.alice.id})

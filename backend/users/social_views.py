@@ -19,6 +19,14 @@ from .social_serializers import (
     CommentReadSerializer,
     CommentWriteSerializer,
 )
+from .social_realtime import (
+    broadcast_event_for_post,
+    comment_count_for_post,
+    like_count_for_post,
+    post_update_payload,
+    serialize_comment_for_realtime,
+    serialize_post_for_realtime,
+)
 
 User = get_user_model()
 
@@ -182,6 +190,18 @@ class FeedView(APIView):
 
         post = _annotated_posts_queryset(request.user, Post.objects.filter(pk=post.pk)).first()
         data = PostReadSerializer(post, context={"request": request}).data
+
+        transaction.on_commit(
+            lambda: broadcast_event_for_post(
+                post,
+                {
+                    "event": "post_created",
+                    "actor_id": request.user.id,
+                    "post_id": post.id,
+                    "post": serialize_post_for_realtime(post, request=request),
+                },
+            )
+        )
         return Response(data, status=201)
 
 
@@ -235,6 +255,18 @@ class PostDetailView(generics.RetrieveUpdateDestroyAPIView):
 
         post = _annotated_posts_queryset(request.user, Post.objects.filter(pk=post.pk)).first()
         data = PostReadSerializer(post, context={"request": request}).data
+
+        transaction.on_commit(
+            lambda: broadcast_event_for_post(
+                post,
+                {
+                    "event": "post_updated",
+                    "actor_id": request.user.id,
+                    "post_id": post.id,
+                    "post": post_update_payload(post, request=request),
+                },
+            )
+        )
         return Response(data)
 
     def delete(self, request, *args, **kwargs):
@@ -242,6 +274,16 @@ class PostDetailView(generics.RetrieveUpdateDestroyAPIView):
         self.check_object_permissions(request, post)
         post.is_deleted = True
         post.save(update_fields=["is_deleted", "updated_at"])
+        transaction.on_commit(
+            lambda: broadcast_event_for_post(
+                post,
+                {
+                    "event": "post_deleted",
+                    "actor_id": request.user.id,
+                    "post_id": post.id,
+                },
+            )
+        )
         return Response(status=204)
 
 
@@ -255,6 +297,18 @@ class LikePostView(APIView):
                 PostLike.objects.create(user=request.user, post=post)
         except IntegrityError:
             return Response({"detail": "Post already liked."}, status=400)
+
+        transaction.on_commit(
+            lambda: broadcast_event_for_post(
+                post,
+                {
+                    "event": "post_liked",
+                    "actor_id": request.user.id,
+                    "post_id": post.id,
+                    "like_count": like_count_for_post(post.id),
+                },
+            )
+        )
         return Response({"detail": "Post liked."}, status=201)
 
 
@@ -266,6 +320,17 @@ class UnlikePostView(APIView):
         deleted, _ = PostLike.objects.filter(user=request.user, post=post).delete()
         if not deleted:
             return Response({"detail": "Post is not liked yet."}, status=400)
+        transaction.on_commit(
+            lambda: broadcast_event_for_post(
+                post,
+                {
+                    "event": "post_unliked",
+                    "actor_id": request.user.id,
+                    "post_id": post.id,
+                    "like_count": like_count_for_post(post.id),
+                },
+            )
+        )
         return Response({"detail": "Post unliked."}, status=200)
 
 
@@ -297,6 +362,18 @@ class CommentListCreateView(APIView):
             parent_comment=serializer.validated_data.get("parent_comment"),
         )
         data = CommentReadSerializer(comment, context={"request": request}).data
+        transaction.on_commit(
+            lambda: broadcast_event_for_post(
+                post,
+                {
+                    "event": "comment_created",
+                    "actor_id": request.user.id,
+                    "post_id": post.id,
+                    "comment": serialize_comment_for_realtime(comment, request=request),
+                    "comment_count": comment_count_for_post(post.id),
+                },
+            )
+        )
         return Response(data, status=201)
 
 
@@ -336,6 +413,18 @@ class CommentDetailView(generics.RetrieveUpdateDestroyAPIView):
             comment.parent_comment = serializer.validated_data["parent_comment"]
         comment.save(update_fields=["content", "parent_comment", "updated_at"])
         data = CommentReadSerializer(comment, context={"request": request}).data
+        transaction.on_commit(
+            lambda: broadcast_event_for_post(
+                comment.post,
+                {
+                    "event": "comment_updated",
+                    "actor_id": request.user.id,
+                    "post_id": comment.post_id,
+                    "comment": serialize_comment_for_realtime(comment, request=request),
+                    "comment_count": comment_count_for_post(comment.post_id),
+                },
+            )
+        )
         return Response(data)
 
     def delete(self, request, *args, **kwargs):
@@ -344,4 +433,17 @@ class CommentDetailView(generics.RetrieveUpdateDestroyAPIView):
         comment.is_deleted = True
         comment.content = "This comment was deleted"
         comment.save(update_fields=["is_deleted", "content", "updated_at"])
+        transaction.on_commit(
+            lambda: broadcast_event_for_post(
+                comment.post,
+                {
+                    "event": "comment_deleted",
+                    "actor_id": request.user.id,
+                    "post_id": comment.post_id,
+                    "comment_id": comment.id,
+                    "comment": serialize_comment_for_realtime(comment, request=request),
+                    "comment_count": comment_count_for_post(comment.post_id),
+                },
+            )
+        )
         return Response(status=204)
