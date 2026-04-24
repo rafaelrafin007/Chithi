@@ -2,6 +2,8 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import SocialNav from "../components/SocialNav";
 import { getNotifications, markAllNotificationsRead, markNotificationRead } from "../services/api";
+import useSocialRealtime from "../hooks/useSocialRealtime";
+import { dispatchNotificationCountSync } from "../utils/notificationEvents";
 
 function normalizePaged(payload) {
   if (Array.isArray(payload)) return { results: payload, next: null };
@@ -66,6 +68,39 @@ export default function NotificationPage() {
   }, [loadNotifications]);
 
   const unreadCount = useMemo(() => items.filter((item) => !item.is_read).length, [items]);
+
+  useEffect(() => {
+    dispatchNotificationCountSync({ unread_count: unreadCount });
+  }, [unreadCount]);
+
+  const handleRealtimeEvent = useCallback((payload) => {
+    const eventName = payload?.event;
+    if (!eventName) return;
+
+    if (eventName === "notification_created" && payload.notification) {
+      setItems((prev) => {
+        const exists = prev.some((item) => item.id === payload.notification.id);
+        if (exists) {
+          return prev.map((item) => (item.id === payload.notification.id ? payload.notification : item));
+        }
+        return [payload.notification, ...prev];
+      });
+      return;
+    }
+
+    if (eventName === "notification_read" && payload.notification_id) {
+      setItems((prev) =>
+        prev.map((item) => (item.id === payload.notification_id ? { ...item, is_read: true } : item))
+      );
+      return;
+    }
+
+    if (eventName === "notification_read_all") {
+      setItems((prev) => prev.map((item) => ({ ...item, is_read: true })));
+    }
+  }, []);
+
+  useSocialRealtime(handleRealtimeEvent, true);
 
   const handleMarkOne = async (notificationId) => {
     setItems((prev) => prev.map((item) => (item.id === notificationId ? { ...item, is_read: true } : item)));

@@ -13,7 +13,7 @@ from asgiref.sync import async_to_sync
 from channels.layers import get_channel_layer
 
 from .serializers import RegisterSerializer, UserProfileSerializer, ProfileSerializer, UserSimpleSerializer, FriendRequestSerializer
-from .models import Profile, FriendRequest, Follow
+from .models import Profile, FriendRequest, Follow, Block, is_blocked_between
 
 User = get_user_model()
 
@@ -102,22 +102,38 @@ class UsersDirectoryView(APIView):
         following_ids = set(
             Follow.objects.filter(follower=request.user).values_list("following_id", flat=True)
         )
+        blocked_by_me_ids = set(
+            Block.objects.filter(blocker=request.user).values_list("blocked_id", flat=True)
+        )
+        blocked_me_ids = set(
+            Block.objects.filter(blocked=request.user).values_list("blocker_id", flat=True)
+        )
         data = []
         for u in users:
             status_label = "none"
-            fr = FriendRequest.objects.filter(
-                (models.Q(from_user=request.user, to_user=u) | models.Q(from_user=u, to_user=request.user))
-            ).order_by("-created_at").first()
-            if fr:
-                if fr.status == FriendRequest.STATUS_ACCEPTED:
-                    status_label = "friends"
-                elif fr.status == FriendRequest.STATUS_PENDING:
-                    status_label = "outgoing" if fr.from_user_id == request.user.id else "incoming"
-                elif fr.status == FriendRequest.STATUS_DECLINED:
-                    status_label = "declined"
+            is_blocked_by_me = u.id in blocked_by_me_ids
+            has_blocked_me = u.id in blocked_me_ids
+
+            if is_blocked_by_me:
+                status_label = "blocked"
+            elif has_blocked_me:
+                status_label = "blocked_by_them"
+            else:
+                fr = FriendRequest.objects.filter(
+                    (models.Q(from_user=request.user, to_user=u) | models.Q(from_user=u, to_user=request.user))
+                ).order_by("-created_at").first()
+                if fr:
+                    if fr.status == FriendRequest.STATUS_ACCEPTED:
+                        status_label = "friends"
+                    elif fr.status == FriendRequest.STATUS_PENDING:
+                        status_label = "outgoing" if fr.from_user_id == request.user.id else "incoming"
+                    elif fr.status == FriendRequest.STATUS_DECLINED:
+                        status_label = "declined"
             serialized = UserSimpleSerializer(u, context={"request": request}).data
             serialized["friend_status"] = status_label
-            serialized["is_following"] = u.id in following_ids
+            serialized["is_following"] = (u.id in following_ids) and not is_blocked_by_me and not has_blocked_me
+            serialized["is_blocked_by_me"] = is_blocked_by_me
+            serialized["has_blocked_me"] = has_blocked_me
             data.append(serialized)
         return Response(data)
 
@@ -143,6 +159,8 @@ class FriendRequestsView(APIView):
             to_user = User.objects.get(pk=to_user_id)
         except User.DoesNotExist:
             return Response({"detail": "User not found"}, status=404)
+        if is_blocked_between(request.user, to_user):
+            return Response({"detail": "Cannot send friend request due to block status."}, status=403)
 
         existing = FriendRequest.objects.filter(
             (models.Q(from_user=request.user, to_user=to_user) | models.Q(from_user=to_user, to_user=request.user))
@@ -217,5 +235,22 @@ class FriendsListView(APIView):
                 friends.add(fr.to_user)
             else:
                 friends.add(fr.from_user)
+        blocked_by_me_ids = set(
+            Block.objects.filter(blocker=request.user).values_list("blocked_id", flat=True)
+        )
+        blocked_me_ids = set(
+            Block.objects.filter(blocked=request.user).values_list("blocker_id", flat=True)
+        )
         serialized = UserSimpleSerializer(list(friends), many=True, context={"request": request}).data
+        for item in serialized:
+            uid = item["id"]
+            item["is_blocked_by_me"] = uid in blocked_by_me_ids
+            item["has_blocked_me"] = uid in blocked_me_ids
+            item["friend_status"] = (
+                "blocked"
+                if item["is_blocked_by_me"]
+                else "blocked_by_them"
+                if item["has_blocked_me"]
+                else "friends"
+            )
         return Response(serialized)

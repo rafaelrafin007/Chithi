@@ -97,6 +97,12 @@ def broadcast_event_for_post(post, payload):
         _send_to_group(social_user_group(user_id), payload)
 
 
+def broadcast_notification_event(recipient_id, payload):
+    if not recipient_id:
+        return
+    _send_to_group(social_user_group(recipient_id), payload)
+
+
 def _send_to_group(group_name, payload):
     channel_layer = get_channel_layer()
     if not channel_layer:

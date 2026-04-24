@@ -3,7 +3,7 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from .models import Block, Follow, Notification, Post, PostLike, Comment, Report
+from .models import Block, Follow, FriendRequest, Notification, Post, PostLike, Comment, Report
 from .social_realtime import recipient_user_ids_for_post
 
 User = get_user_model()
@@ -377,6 +377,12 @@ class SocialNotificationAndSafetyTests(APITestCase):
     def _auth(self, user):
         self.client.force_authenticate(user=user)
 
+    def _unread_count(self, user):
+        self._auth(user)
+        response = self.client.get("/api/social/notifications/unread-count/")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        return int(response.data.get("unread_count", 0))
+
     def test_follow_creates_notification(self):
         self._auth(self.bob)
         response = self.client.post(f"/api/social/profiles/{self.alice.id}/follow/", {}, format="json")
@@ -481,16 +487,92 @@ class SocialNotificationAndSafetyTests(APITestCase):
 
     def test_mark_one_notification_as_read(self):
         notif = Notification.objects.create(recipient=self.alice, actor=self.bob, type=Notification.TYPE_FOLLOW)
+        Notification.objects.create(recipient=self.alice, actor=self.charlie, type=Notification.TYPE_FOLLOW)
+        self.assertEqual(self._unread_count(self.alice), 2)
         self._auth(self.alice)
         response = self.client.post(f"/api/social/notifications/{notif.id}/read/", {}, format="json")
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         notif.refresh_from_db()
         self.assertTrue(notif.is_read)
+        self.assertEqual(self._unread_count(self.alice), 1)
 
     def test_mark_all_notifications_as_read(self):
         Notification.objects.create(recipient=self.alice, actor=self.bob, type=Notification.TYPE_FOLLOW)
         Notification.objects.create(recipient=self.alice, actor=self.charlie, type=Notification.TYPE_FOLLOW)
+        self.assertEqual(self._unread_count(self.alice), 2)
         self._auth(self.alice)
         response = self.client.post("/api/social/notifications/read-all/", {}, format="json")
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(Notification.objects.filter(recipient=self.alice, is_read=True).count(), 2)
+        self.assertEqual(self._unread_count(self.alice), 0)
+
+    def test_unread_notification_count_is_correct(self):
+        Notification.objects.create(recipient=self.alice, actor=self.bob, type=Notification.TYPE_FOLLOW, is_read=False)
+        Notification.objects.create(recipient=self.alice, actor=self.charlie, type=Notification.TYPE_FOLLOW, is_read=True)
+        self.assertEqual(self._unread_count(self.alice), 1)
+
+    def test_follow_like_comment_update_unread_count(self):
+        post = Post.objects.create(author=self.alice, content="Track counts", visibility=Post.VISIBILITY_PUBLIC)
+
+        self._auth(self.bob)
+        follow_response = self.client.post(f"/api/social/profiles/{self.alice.id}/follow/", {}, format="json")
+        self.assertEqual(follow_response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(self._unread_count(self.alice), 1)
+
+        self._auth(self.bob)
+        like_response = self.client.post(f"/api/social/posts/{post.id}/like/", {}, format="json")
+        self.assertEqual(like_response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(self._unread_count(self.alice), 2)
+
+        self._auth(self.charlie)
+        comment_response = self.client.post(
+            f"/api/social/posts/{post.id}/comments/",
+            {"content": "counting"},
+            format="json",
+        )
+        self.assertEqual(comment_response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(self._unread_count(self.alice), 3)
+
+    def test_users_directory_includes_block_state_flags(self):
+        Block.objects.create(blocker=self.alice, blocked=self.bob)
+        self._auth(self.alice)
+        response = self.client.get("/api/auth/users/")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        bob_entry = next((u for u in response.data if u["id"] == self.bob.id), None)
+        self.assertIsNotNone(bob_entry)
+        self.assertTrue(bob_entry["is_blocked_by_me"])
+        self.assertFalse(bob_entry["has_blocked_me"])
+        self.assertEqual(bob_entry["friend_status"], "blocked")
+
+    def test_blocked_user_discoverable_and_unblockable_without_profile(self):
+        self._auth(self.alice)
+        block_response = self.client.post(f"/api/social/blocks/{self.bob.id}/", {}, format="json")
+        self.assertEqual(block_response.status_code, status.HTTP_201_CREATED)
+
+        directory_before = self.client.get("/api/auth/users/")
+        self.assertEqual(directory_before.status_code, status.HTTP_200_OK)
+        bob_entry_before = next((u for u in directory_before.data if u["id"] == self.bob.id), None)
+        self.assertIsNotNone(bob_entry_before)
+        self.assertTrue(bob_entry_before["is_blocked_by_me"])
+
+        unblock_response = self.client.delete(f"/api/social/blocks/{self.bob.id}/")
+        self.assertEqual(unblock_response.status_code, status.HTTP_204_NO_CONTENT)
+
+        directory_after = self.client.get("/api/auth/users/")
+        self.assertEqual(directory_after.status_code, status.HTTP_200_OK)
+        bob_entry_after = next((u for u in directory_after.data if u["id"] == self.bob.id), None)
+        self.assertIsNotNone(bob_entry_after)
+        self.assertFalse(bob_entry_after["is_blocked_by_me"])
+
+    def test_blocked_user_not_reported_as_normal_connected_or_followable(self):
+        Follow.objects.create(follower=self.alice, following=self.bob)
+        FriendRequest.objects.create(from_user=self.alice, to_user=self.bob, status=FriendRequest.STATUS_ACCEPTED)
+        Block.objects.create(blocker=self.alice, blocked=self.bob)
+
+        self._auth(self.alice)
+        response = self.client.get("/api/auth/users/")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        bob_entry = next((u for u in response.data if u["id"] == self.bob.id), None)
+        self.assertIsNotNone(bob_entry)
+        self.assertEqual(bob_entry["friend_status"], "blocked")
+        self.assertFalse(bob_entry["is_following"])

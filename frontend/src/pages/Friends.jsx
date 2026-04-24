@@ -9,6 +9,7 @@ import {
   sendFriendRequest,
   respondFriendRequest,
   cancelFriendRequest,
+  unblockUser,
 } from "../services/api";
 
 export default function Friends() {
@@ -16,6 +17,7 @@ export default function Friends() {
   const [incoming, setIncoming] = useState([]);
   const [outgoing, setOutgoing] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [actionError, setActionError] = useState("");
   const nav = useNavigate();
 
   useEffect(() => {
@@ -43,18 +45,33 @@ export default function Friends() {
   }, []);
 
   const handleSend = async (userId) => {
-    await sendFriendRequest(userId);
-    await load();
+    try {
+      setActionError("");
+      await sendFriendRequest(userId);
+      await load();
+    } catch (e) {
+      setActionError(e?.response?.data?.detail || "Failed to send friend request.");
+    }
   };
 
   const handleRespond = async (requestId, action) => {
-    await respondFriendRequest(requestId, action);
-    await load();
+    try {
+      setActionError("");
+      await respondFriendRequest(requestId, action);
+      await load();
+    } catch (e) {
+      setActionError(e?.response?.data?.detail || "Failed to respond to request.");
+    }
   };
 
   const handleCancel = async (requestId) => {
-    await cancelFriendRequest(requestId);
-    await load();
+    try {
+      setActionError("");
+      await cancelFriendRequest(requestId);
+      await load();
+    } catch (e) {
+      setActionError(e?.response?.data?.detail || "Failed to cancel request.");
+    }
   };
 
   const handleFollowChanged = (userId, nextFollowing) => {
@@ -63,6 +80,22 @@ export default function Friends() {
         item.id === userId ? { ...item, is_following: nextFollowing } : item
       )
     );
+  };
+
+  const handleUnblock = async (identifier, userId) => {
+    try {
+      setActionError("");
+      await unblockUser(identifier);
+      setUsers((prev) =>
+        prev.map((item) =>
+          item.id === userId
+            ? { ...item, is_blocked_by_me: false, friend_status: item.has_blocked_me ? "blocked_by_them" : "none" }
+            : item
+        )
+      );
+    } catch (e) {
+      setActionError(e?.response?.data?.detail || "Failed to unblock user.");
+    }
   };
 
   return (
@@ -85,6 +118,7 @@ export default function Friends() {
           <p className="friends-muted">Loading...</p>
         ) : (
           <div className="friends-grid">
+            {actionError && <div className="friends-inline-error">{actionError}</div>}
             <section className="friends-card">
               <div className="friends-card-title">Incoming Requests</div>
               {incoming.length === 0 && <p className="friends-muted">No incoming requests.</p>}
@@ -132,38 +166,50 @@ export default function Friends() {
                       {u.display_name || u.username}
                       <span className="friends-id">#{u.id}</span>
                     </div>
-                    {u.friend_status === "friends" && <div className="friends-meta success">Friends</div>}
-                {u.friend_status === "incoming" && <div className="friends-meta warn">Requested you</div>}
-                {u.friend_status === "outgoing" && <div className="friends-meta">Pending</div>}
+                    {u.is_blocked_by_me && <div className="friends-meta blocked">Blocked</div>}
+                    {u.has_blocked_me && <div className="friends-meta danger">Blocked you</div>}
+                    {!u.is_blocked_by_me && !u.has_blocked_me && u.friend_status === "friends" && <div className="friends-meta success">Friends</div>}
+                    {!u.is_blocked_by_me && !u.has_blocked_me && u.friend_status === "incoming" && <div className="friends-meta warn">Requested you</div>}
+                    {!u.is_blocked_by_me && !u.has_blocked_me && u.friend_status === "outgoing" && <div className="friends-meta">Pending</div>}
               </div>
               <div className="friends-actions">
-                <FollowButton
-                  identifier={u.id}
-                  isFollowing={!!u.is_following}
-                  onChange={(nextFollowing) => handleFollowChanged(u.id, nextFollowing)}
-                />
-                {u.friend_status === "none" && (
-                  <button className="btn btn-primary" onClick={() => handleSend(u.id)}>
-                    Add friend
+                {u.is_blocked_by_me ? (
+                  <button className="btn btn-secondary" onClick={() => handleUnblock(u.username || u.id, u.id)}>
+                    Unblock
                   </button>
+                ) : u.has_blocked_me ? (
+                  <span className="friends-chip blocked">Unavailable</span>
+                ) : (
+                  <>
+                    <FollowButton
+                      identifier={u.id}
+                      isFollowing={!!u.is_following}
+                      onChange={(nextFollowing) => handleFollowChanged(u.id, nextFollowing)}
+                    />
+                    {u.friend_status === "none" && (
+                      <button className="btn btn-primary" onClick={() => handleSend(u.id)}>
+                        Add friend
+                      </button>
+                    )}
+                    {u.friend_status === "declined" && (
+                      <button className="btn btn-secondary" onClick={() => handleSend(u.id)}>
+                        Add again
+                      </button>
+                    )}
+                    {u.friend_status === "outgoing" && (
+                      <button
+                        className="btn btn-secondary"
+                        onClick={() => {
+                          const pending = outgoing.find((o) => o.to_user?.id === u.id);
+                          if (pending) handleCancel(pending.id);
+                        }}
+                      >
+                        Cancel
+                      </button>
+                    )}
+                    {u.friend_status === "friends" && <span className="friends-chip">Connected</span>}
+                  </>
                 )}
-                {u.friend_status === "declined" && (
-                  <button className="btn btn-secondary" onClick={() => handleSend(u.id)}>
-                    Add again
-                  </button>
-                )}
-                {u.friend_status === "outgoing" && (
-                  <button
-                    className="btn btn-secondary"
-                    onClick={() => {
-                      const pending = outgoing.find((o) => o.to_user?.id === u.id);
-                      if (pending) handleCancel(pending.id);
-                    }}
-                  >
-                    Cancel
-                  </button>
-                )}
-                {u.friend_status === "friends" && <span className="friends-chip">Connected</span>}
               </div>
             </div>
           ))}

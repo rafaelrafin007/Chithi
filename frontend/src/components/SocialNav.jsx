@@ -1,11 +1,13 @@
 import React from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import useNotificationCount from "../hooks/useNotificationCount";
 
 export default function SocialNav({ className = "" }) {
   const nav = useNavigate();
   const location = useLocation();
   const { user } = useAuth();
+  const { unreadCount } = useNotificationCount(!!user?.id);
 
   const profileIdentifier = user?.username || user?.id;
 
@@ -34,7 +36,10 @@ export default function SocialNav({ className = "" }) {
             className={`social-nav-btn ${isActive ? "active" : ""}`}
             onClick={() => nav(item.to)}
           >
-            {item.label}
+            <span>{item.label}</span>
+            {item.key === "notifications" && unreadCount > 0 && (
+              <span className="social-nav-badge">{unreadCount > 99 ? "99+" : unreadCount}</span>
+            )}
           </button>
         );
       })}

@@ -24,6 +24,7 @@ from .social_serializers import (
 )
 from .social_realtime import (
     broadcast_event_for_post,
+    broadcast_notification_event,
     comment_count_for_post,
     like_count_for_post,
     post_update_payload,
@@ -66,12 +67,22 @@ def _create_notification_if_applicable(recipient, actor, notification_type, targ
         return
     if recipient.id == actor.id:
         return
-    Notification.objects.create(
+    notification = Notification.objects.create(
         recipient=recipient,
         actor=actor,
         type=notification_type,
         target_post=target_post,
         target_comment=target_comment,
+    )
+    payload = NotificationReadSerializer(notification, context={}).data
+    unread_count = Notification.objects.filter(recipient=recipient, is_read=False).count()
+    broadcast_notification_event(
+        recipient.id,
+        {
+            "event": "notification_created",
+            "notification": payload,
+            "unread_count": unread_count,
+        },
     )
 
 
@@ -529,14 +540,34 @@ class NotificationListView(APIView):
         return paginator.get_paginated_response(data)
 
 
+class NotificationUnreadCountView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        unread_count = Notification.objects.filter(recipient=request.user, is_read=False).count()
+        return Response({"unread_count": unread_count}, status=200)
+
+
 class NotificationMarkReadView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def post(self, request, notification_id):
         notification = get_object_or_404(Notification, pk=notification_id, recipient=request.user)
+        changed = False
         if not notification.is_read:
             notification.is_read = True
             notification.save(update_fields=["is_read"])
+            changed = True
+        if changed:
+            unread_count = Notification.objects.filter(recipient=request.user, is_read=False).count()
+            broadcast_notification_event(
+                request.user.id,
+                {
+                    "event": "notification_read",
+                    "notification_id": notification.id,
+                    "unread_count": unread_count,
+                },
+            )
         data = NotificationReadSerializer(notification, context={"request": request}).data
         return Response(data, status=200)
 
@@ -545,7 +576,15 @@ class NotificationMarkAllReadView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def post(self, request):
-        Notification.objects.filter(recipient=request.user, is_read=False).update(is_read=True)
+        updated = Notification.objects.filter(recipient=request.user, is_read=False).update(is_read=True)
+        if updated:
+            broadcast_notification_event(
+                request.user.id,
+                {
+                    "event": "notification_read_all",
+                    "unread_count": 0,
+                },
+            )
         return Response({"detail": "All notifications marked as read."}, status=200)
 
 

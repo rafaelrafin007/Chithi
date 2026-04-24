@@ -99,6 +99,7 @@ export const socialApi = {
   editPost: (postId, payload) => api.patch(`${SOCIAL_BASE}/posts/${postId}/`, payload),
   deletePost: (postId) => api.delete(`${SOCIAL_BASE}/posts/${postId}/`),
   getNotifications: (params = {}) => api.get(`${SOCIAL_BASE}/notifications/`, { params }),
+  getUnreadNotificationCount: () => api.get(`${SOCIAL_BASE}/notifications/unread-count/`),
   markNotificationRead: (notificationId) =>
     api.post(`${SOCIAL_BASE}/notifications/${notificationId}/read/`),
   markAllNotificationsRead: () => api.post(`${SOCIAL_BASE}/notifications/read-all/`),
@@ -124,6 +125,7 @@ export const deleteComment = socialApi.deleteComment;
 export const editPost = socialApi.editPost;
 export const deletePost = socialApi.deletePost;
 export const getNotifications = socialApi.getNotifications;
+export const getUnreadNotificationCount = socialApi.getUnreadNotificationCount;
 export const markNotificationRead = socialApi.markNotificationRead;
 export const markAllNotificationsRead = socialApi.markAllNotificationsRead;
 export const getBlockedUsers = socialApi.getBlockedUsers;

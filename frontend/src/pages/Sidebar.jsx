@@ -3,9 +3,11 @@ import React, { useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import ProfilePanel from "../pages/ProfilePanel";
+import useNotificationCount from "../hooks/useNotificationCount";
 
 export default function Sidebar({ users, selected, setSelected, theme, toggleTheme, width }) {
   const { user, logout } = useAuth();
+  const { unreadCount } = useNotificationCount(!!user?.id);
   const [showProfile, setShowProfile] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const nav = useNavigate();
@@ -90,6 +92,12 @@ export default function Sidebar({ users, selected, setSelected, theme, toggleThe
             onClick={() => nav("/friends")}
           >
             Friends
+          </button>
+          <button
+            className={`btn btn-secondary small ${location.pathname.startsWith("/notifications") ? "active" : ""}`}
+            onClick={() => nav("/notifications")}
+          >
+            Notifications{unreadCount > 0 ? ` (${unreadCount > 99 ? "99+" : unreadCount})` : ""}
           </button>
           <button
             className={`btn btn-secondary small ${location.pathname.startsWith("/profile/") ? "active" : ""}`}

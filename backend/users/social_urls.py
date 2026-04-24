@@ -14,6 +14,7 @@ from .social_views import (
     CommentListCreateView,
     CommentDetailView,
     NotificationListView,
+    NotificationUnreadCountView,
     NotificationMarkReadView,
     NotificationMarkAllReadView,
     BlockListView,
@@ -41,6 +42,7 @@ urlpatterns = [
     path("comments/<int:comment_id>/", CommentDetailView.as_view(), name="social-comment-detail"),
     # Notifications
     path("notifications/", NotificationListView.as_view(), name="social-notification-list"),
+    path("notifications/unread-count/", NotificationUnreadCountView.as_view(), name="social-notification-unread-count"),
     path("notifications/<int:notification_id>/read/", NotificationMarkReadView.as_view(), name="social-notification-read"),
     path("notifications/read-all/", NotificationMarkAllReadView.as_view(), name="social-notification-read-all"),
     # Safety: blocks
