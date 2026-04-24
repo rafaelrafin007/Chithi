@@ -31,6 +31,20 @@ function buildMessage(notification) {
   return `${actor} sent an update`;
 }
 
+function notificationDestination(notification) {
+  const actorIdentifier = notification?.actor?.username || notification?.actor?.id;
+  if (notification?.type === "follow") {
+    return actorIdentifier ? `/profile/${actorIdentifier}` : null;
+  }
+  if (notification?.type === "post_like" || notification?.type === "post_comment") {
+    if (notification?.target_post_id) {
+      return `/post/${notification.target_post_id}`;
+    }
+    return actorIdentifier ? `/profile/${actorIdentifier}` : null;
+  }
+  return actorIdentifier ? `/profile/${actorIdentifier}` : null;
+}
+
 export default function NotificationPage() {
   const nav = useNavigate();
   const [items, setItems] = useState([]);
@@ -175,13 +189,16 @@ export default function NotificationPage() {
           <div className="social-state">No notifications yet.</div>
         ) : (
           <div className="social-list">
-            {items.map((item) => (
-              <article key={item.id} className={`social-card notification-card ${item.is_read ? "read" : "unread"}`}>
+            {items.map((item) => {
+              const destination = notificationDestination(item);
+              return (
+                <article key={item.id} className={`social-card notification-card ${item.is_read ? "read" : "unread"}`}>
                 <div className="notification-main">
                   <button
                     type="button"
                     className="notification-actor-link"
-                    onClick={() => item.actor?.username && nav(`/profile/${item.actor.username}`)}
+                    onClick={() => destination && nav(destination)}
+                    disabled={!destination}
                   >
                     {item.actor?.avatar_url ? (
                       <img src={item.actor.avatar_url} alt={item.actor.display_name || item.actor.username} className="post-avatar" />
@@ -203,13 +220,23 @@ export default function NotificationPage() {
                     </button>
                   )}
                   {item.target_post_id && (
-                    <button type="button" className="social-link-btn" onClick={() => nav("/feed")}>
-                      View post
+                    <button type="button" className="social-link-btn" onClick={() => nav(`/post/${item.target_post_id}`)}>
+                      Open post
+                    </button>
+                  )}
+                  {!item.target_post_id && item.type === "follow" && item.actor && (
+                    <button
+                      type="button"
+                      className="social-link-btn"
+                      onClick={() => nav(`/profile/${item.actor.username || item.actor.id}`)}
+                    >
+                      Open profile
                     </button>
                   )}
                 </div>
-              </article>
-            ))}
+                </article>
+              );
+            })}
             {nextPage && (
               <button type="button" className="social-load-btn" onClick={loadMore} disabled={loadingMore}>
                 {loadingMore ? "Loading..." : "Load more"}

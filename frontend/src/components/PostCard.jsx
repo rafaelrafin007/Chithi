@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { deletePost, editPost, likePost, reportPost, unlikePost } from "../services/api";
 import CommentSection from "./CommentSection";
@@ -23,9 +23,11 @@ export default function PostCard({
   currentUserId,
   onPostUpdated,
   onPostRemoved,
+  initialCommentsOpen = false,
+  showOpenPostButton = true,
 }) {
   const nav = useNavigate();
-  const [showComments, setShowComments] = useState(false);
+  const [showComments, setShowComments] = useState(initialCommentsOpen);
   const [isLiking, setIsLiking] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [editText, setEditText] = useState(post?.content || "");
@@ -36,6 +38,10 @@ export default function PostCard({
   const [error, setError] = useState("");
 
   const mine = post?.author?.id === currentUserId;
+
+  useEffect(() => {
+    setShowComments(initialCommentsOpen);
+  }, [initialCommentsOpen, post?.id]);
 
   const setCountFromComments = (nextCount) => {
     onPostUpdated?.(post.id, { comment_count: nextCount });
@@ -185,6 +191,11 @@ export default function PostCard({
         <button type="button" className="social-link-btn" onClick={() => setShowComments((v) => !v)}>
           {showComments ? "Hide comments" : "Comment"}
         </button>
+        {showOpenPostButton && (
+          <button type="button" className="social-link-btn" onClick={() => nav(`/post/${post.id}`)}>
+            Open post
+          </button>
+        )}
         {mine && !isEditing && (
           <>
             <button type="button" className="social-link-btn" onClick={() => setIsEditing(true)}>

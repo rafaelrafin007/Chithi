@@ -202,8 +202,8 @@ class CommentReadSerializer(serializers.ModelSerializer):
 
 class NotificationReadSerializer(serializers.ModelSerializer):
     actor = UserSimpleSerializer(read_only=True)
-    target_post_id = serializers.IntegerField(source="target_post.id", read_only=True)
-    target_comment_id = serializers.IntegerField(source="target_comment.id", read_only=True)
+    target_post_id = serializers.SerializerMethodField()
+    target_comment_id = serializers.SerializerMethodField()
 
     class Meta:
         model = Notification
@@ -216,6 +216,12 @@ class NotificationReadSerializer(serializers.ModelSerializer):
             "target_post_id",
             "target_comment_id",
         )
+
+    def get_target_post_id(self, obj):
+        return obj.target_post_id
+
+    def get_target_comment_id(self, obj):
+        return obj.target_comment_id
 
 
 class ReportWriteSerializer(serializers.ModelSerializer):

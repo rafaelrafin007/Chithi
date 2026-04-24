@@ -109,6 +109,69 @@ def _get_visible_post_or_404(user, post_id):
     return get_object_or_404(queryset, pk=post_id)
 
 
+class UserSearchView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+    pagination_class = StandardPagination
+
+    def get(self, request):
+        query = (request.query_params.get("q") or "").strip()
+        blocked_by_me_exists = Block.objects.filter(blocker=request.user, blocked=OuterRef("pk"))
+        has_blocked_me_exists = Block.objects.filter(blocker=OuterRef("pk"), blocked=request.user)
+        following_exists = Follow.objects.filter(follower=request.user, following=OuterRef("pk"))
+
+        queryset = (
+            User.objects.exclude(pk=request.user.id)
+            .select_related("profile")
+            .annotate(
+                is_blocked_by_me=Exists(blocked_by_me_exists),
+                has_blocked_me=Exists(has_blocked_me_exists),
+                is_following=Exists(following_exists),
+            )
+            .filter(is_blocked_by_me=False, has_blocked_me=False)
+            .order_by("username")
+        )
+        if query:
+            queryset = queryset.filter(
+                Q(username__icontains=query) | Q(profile__display_name__icontains=query)
+            )
+
+        paginator = self.pagination_class()
+        page = paginator.paginate_queryset(queryset, request, view=self)
+        serialized = UserSimpleSerializer(page, many=True, context={"request": request}).data
+        for item, user_obj in zip(serialized, page):
+            item["is_following"] = bool(getattr(user_obj, "is_following", False))
+            item["is_blocked_by_me"] = bool(getattr(user_obj, "is_blocked_by_me", False))
+            item["has_blocked_me"] = bool(getattr(user_obj, "has_blocked_me", False))
+        return paginator.get_paginated_response(serialized)
+
+
+class PostSearchView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+    pagination_class = StandardPagination
+
+    def get(self, request):
+        query = (request.query_params.get("q") or "").strip()
+        blocked_exists = Block.objects.filter(
+            Q(blocker=request.user, blocked=OuterRef("author_id")) | Q(blocked=request.user, blocker=OuterRef("author_id"))
+        )
+        queryset = Post.objects.filter(
+            is_deleted=False,
+            visibility=Post.VISIBILITY_PUBLIC,
+        ).annotate(_is_blocked_author=Exists(blocked_exists)).filter(_is_blocked_author=False)
+        if query:
+            queryset = queryset.filter(
+                Q(content__icontains=query)
+                | Q(author__username__icontains=query)
+                | Q(author__profile__display_name__icontains=query)
+            )
+
+        queryset = _annotated_posts_queryset(request.user, queryset)
+        paginator = self.pagination_class()
+        page = paginator.paginate_queryset(queryset, request, view=self)
+        serialized = PostReadSerializer(page, many=True, context={"request": request}).data
+        return paginator.get_paginated_response(serialized)
+
+
 class PublicProfileView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 

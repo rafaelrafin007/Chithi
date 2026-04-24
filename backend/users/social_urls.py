@@ -1,6 +1,8 @@
 from django.urls import path
 
 from .social_views import (
+    UserSearchView,
+    PostSearchView,
     PublicProfileView,
     FollowUserView,
     UnfollowUserView,
@@ -24,6 +26,9 @@ from .social_views import (
 )
 
 urlpatterns = [
+    # Search / discovery
+    path("search/users/", UserSearchView.as_view(), name="social-search-users"),
+    path("search/posts/", PostSearchView.as_view(), name="social-search-posts"),
     # Profiles / social graph
     path("profiles/<str:identifier>/", PublicProfileView.as_view(), name="social-profile-detail"),
     path("profiles/<str:identifier>/follow/", FollowUserView.as_view(), name="social-follow-user"),

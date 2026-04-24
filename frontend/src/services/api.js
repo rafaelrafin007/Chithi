@@ -89,6 +89,7 @@ export const socialApi = {
   unfollowUser: (identifier) => api.post(`${SOCIAL_BASE}/profiles/${identifier}/unfollow/`),
   getProfilePosts: (identifier, params = {}) =>
     api.get(`${SOCIAL_BASE}/profiles/${identifier}/posts/`, { params }),
+  getPostDetail: (postId) => api.get(`${SOCIAL_BASE}/posts/${postId}/`),
   likePost: (postId) => api.post(`${SOCIAL_BASE}/posts/${postId}/like/`),
   unlikePost: (postId) => api.post(`${SOCIAL_BASE}/posts/${postId}/unlike/`),
   getComments: (postId, params = {}) =>
@@ -108,6 +109,8 @@ export const socialApi = {
   unblockUser: (identifier) => api.delete(`${SOCIAL_BASE}/blocks/${identifier}/`),
   reportUser: (identifier, payload) => api.post(`${SOCIAL_BASE}/reports/users/${identifier}/`, payload),
   reportPost: (postId, payload) => api.post(`${SOCIAL_BASE}/reports/posts/${postId}/`, payload),
+  searchUsers: (params = {}) => api.get(`${SOCIAL_BASE}/search/users/`, { params }),
+  searchPosts: (params = {}) => api.get(`${SOCIAL_BASE}/search/posts/`, { params }),
 };
 
 export const getFeed = socialApi.getFeed;
@@ -116,6 +119,7 @@ export const getSocialProfile = socialApi.getProfile;
 export const followUser = socialApi.followUser;
 export const unfollowUser = socialApi.unfollowUser;
 export const getProfilePosts = socialApi.getProfilePosts;
+export const getPostDetail = socialApi.getPostDetail;
 export const likePost = socialApi.likePost;
 export const unlikePost = socialApi.unlikePost;
 export const getComments = socialApi.getComments;
@@ -133,6 +137,8 @@ export const blockUser = socialApi.blockUser;
 export const unblockUser = socialApi.unblockUser;
 export const reportUser = socialApi.reportUser;
 export const reportPost = socialApi.reportPost;
+export const searchUsers = socialApi.searchUsers;
+export const searchPosts = socialApi.searchPosts;
 
 // ---- Token refresh handling ----
 let isRefreshing = false;

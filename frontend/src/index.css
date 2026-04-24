@@ -1686,6 +1686,47 @@ body.dark-theme .edit-icon{color:#fff;}
   flex-wrap: wrap;
 }
 
+.search-form {
+  margin: 0;
+  max-width: none;
+  padding: 0;
+  background: transparent;
+  box-shadow: none;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  opacity: 1;
+  transform: none;
+  animation: none;
+}
+
+.search-input {
+  width: 100%;
+}
+
+.search-user-list {
+  display: grid;
+  gap: 10px;
+}
+
+.search-user-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  padding: 8px 10px;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.post-detail-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
 body.light-theme .social-page {
   background:
     radial-gradient(900px 320px at 0% -10%, rgba(72, 131, 220, 0.2), transparent 65%),
@@ -1738,6 +1779,11 @@ body.light-theme .comment-item {
 body.light-theme .notification-card.unread {
   border-color: rgba(51, 106, 198, 0.42);
   background: rgba(51, 106, 198, 0.08);
+}
+
+body.light-theme .search-user-row {
+  border-color: rgba(17, 24, 39, 0.1);
+  background: rgba(17, 24, 39, 0.02);
 }
 
 @media (max-width: 760px) {

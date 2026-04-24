@@ -576,3 +576,146 @@ class SocialNotificationAndSafetyTests(APITestCase):
         self.assertIsNotNone(bob_entry)
         self.assertEqual(bob_entry["friend_status"], "blocked")
         self.assertFalse(bob_entry["is_following"])
+
+
+class SocialDiscoveryAndPostDetailTests(APITestCase):
+    def setUp(self):
+        self.alice = User.objects.create_user(username="alice_sd", password="pass12345")
+        self.bob = User.objects.create_user(username="bob_sd", password="pass12345")
+        self.charlie = User.objects.create_user(username="charlie_sd", password="pass12345")
+        self.alice.profile.display_name = "Alice Wonder"
+        self.alice.profile.save(update_fields=["display_name"])
+        self.bob.profile.display_name = "Builder Bob"
+        self.bob.profile.save(update_fields=["display_name"])
+        self.charlie.profile.display_name = "Charlie Arc"
+        self.charlie.profile.save(update_fields=["display_name"])
+
+    def _auth(self, user):
+        self.client.force_authenticate(user=user)
+
+    def _results(self, response):
+        if isinstance(response.data, dict) and "results" in response.data:
+            return response.data["results"]
+        return response.data
+
+    def test_single_post_detail_respects_visibility_rules(self):
+        public_post = Post.objects.create(
+            author=self.alice,
+            content="Public detail",
+            visibility=Post.VISIBILITY_PUBLIC,
+        )
+        followers_post = Post.objects.create(
+            author=self.alice,
+            content="Followers-only detail",
+            visibility=Post.VISIBILITY_FOLLOWERS_ONLY,
+        )
+        private_post = Post.objects.create(
+            author=self.alice,
+            content="Private detail",
+            visibility=Post.VISIBILITY_PRIVATE,
+        )
+        Follow.objects.create(follower=self.bob, following=self.alice)
+
+        self._auth(self.charlie)
+        public_for_non_follower = self.client.get(f"/api/social/posts/{public_post.id}/")
+        followers_for_non_follower = self.client.get(f"/api/social/posts/{followers_post.id}/")
+        self.assertEqual(public_for_non_follower.status_code, status.HTTP_200_OK)
+        self.assertEqual(followers_for_non_follower.status_code, status.HTTP_404_NOT_FOUND)
+
+        self._auth(self.bob)
+        followers_for_follower = self.client.get(f"/api/social/posts/{followers_post.id}/")
+        private_for_follower = self.client.get(f"/api/social/posts/{private_post.id}/")
+        self.assertEqual(followers_for_follower.status_code, status.HTTP_200_OK)
+        self.assertEqual(private_for_follower.status_code, status.HTTP_404_NOT_FOUND)
+
+        self._auth(self.alice)
+        private_for_author = self.client.get(f"/api/social/posts/{private_post.id}/")
+        self.assertEqual(private_for_author.status_code, status.HTTP_200_OK)
+
+    def test_blocked_user_cannot_access_post_detail(self):
+        post = Post.objects.create(author=self.alice, content="Blocked detail", visibility=Post.VISIBILITY_PUBLIC)
+        Block.objects.create(blocker=self.alice, blocked=self.bob)
+        self._auth(self.bob)
+        response = self.client.get(f"/api/social/posts/{post.id}/")
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_user_search_returns_expected_users_by_username_and_display_name(self):
+        self._auth(self.alice)
+        username_response = self.client.get("/api/social/search/users/", {"q": "bob_sd"})
+        self.assertEqual(username_response.status_code, status.HTTP_200_OK)
+        username_ids = [item["id"] for item in self._results(username_response)]
+        self.assertIn(self.bob.id, username_ids)
+
+        display_name_response = self.client.get("/api/social/search/users/", {"q": "Charlie Arc"})
+        self.assertEqual(display_name_response.status_code, status.HTTP_200_OK)
+        display_name_ids = [item["id"] for item in self._results(display_name_response)]
+        self.assertIn(self.charlie.id, display_name_ids)
+
+    def test_blocked_users_are_excluded_from_user_search(self):
+        Block.objects.create(blocker=self.alice, blocked=self.bob)
+        self._auth(self.alice)
+        response = self.client.get("/api/social/search/users/", {"q": "bob"})
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        result_ids = [item["id"] for item in self._results(response)]
+        self.assertNotIn(self.bob.id, result_ids)
+
+    def test_public_post_search_returns_only_allowed_public_posts(self):
+        bob_public = Post.objects.create(author=self.bob, content="hello world", visibility=Post.VISIBILITY_PUBLIC)
+        Post.objects.create(author=self.bob, content="followers", visibility=Post.VISIBILITY_FOLLOWERS_ONLY)
+        Post.objects.create(author=self.bob, content="private", visibility=Post.VISIBILITY_PRIVATE)
+        charlie_public = Post.objects.create(author=self.charlie, content="hello from charlie", visibility=Post.VISIBILITY_PUBLIC)
+
+        self._auth(self.alice)
+        all_public_response = self.client.get("/api/social/search/posts/")
+        self.assertEqual(all_public_response.status_code, status.HTTP_200_OK)
+        all_public_ids = [item["id"] for item in self._results(all_public_response)]
+        self.assertIn(bob_public.id, all_public_ids)
+        self.assertIn(charlie_public.id, all_public_ids)
+        self.assertEqual(len(all_public_ids), 2)
+
+        query_response = self.client.get("/api/social/search/posts/", {"q": "charlie"})
+        self.assertEqual(query_response.status_code, status.HTTP_200_OK)
+        query_ids = [item["id"] for item in self._results(query_response)]
+        self.assertEqual(query_ids, [charlie_public.id])
+
+        Block.objects.create(blocker=self.alice, blocked=self.charlie)
+        blocked_response = self.client.get("/api/social/search/posts/", {"q": "charlie"})
+        self.assertEqual(blocked_response.status_code, status.HTTP_200_OK)
+        blocked_ids = [item["id"] for item in self._results(blocked_response)]
+        self.assertNotIn(charlie_public.id, blocked_ids)
+
+    def test_notification_payload_contains_deep_link_targets(self):
+        post = Post.objects.create(author=self.alice, content="Notify me", visibility=Post.VISIBILITY_PUBLIC)
+
+        self._auth(self.bob)
+        like_response = self.client.post(f"/api/social/posts/{post.id}/like/", {}, format="json")
+        self.assertEqual(like_response.status_code, status.HTTP_201_CREATED)
+        comment_response = self.client.post(
+            f"/api/social/posts/{post.id}/comments/",
+            {"content": "deep link comment"},
+            format="json",
+        )
+        self.assertEqual(comment_response.status_code, status.HTTP_201_CREATED)
+
+        self._auth(self.charlie)
+        follow_response = self.client.post(f"/api/social/profiles/{self.alice.id}/follow/", {}, format="json")
+        self.assertEqual(follow_response.status_code, status.HTTP_201_CREATED)
+
+        self._auth(self.alice)
+        notifications_response = self.client.get("/api/social/notifications/")
+        self.assertEqual(notifications_response.status_code, status.HTTP_200_OK)
+        notifications = self._results(notifications_response)
+
+        like_notification = next((item for item in notifications if item["type"] == Notification.TYPE_POST_LIKE), None)
+        comment_notification = next((item for item in notifications if item["type"] == Notification.TYPE_POST_COMMENT), None)
+        follow_notification = next((item for item in notifications if item["type"] == Notification.TYPE_FOLLOW), None)
+
+        self.assertIsNotNone(like_notification)
+        self.assertIsNotNone(comment_notification)
+        self.assertIsNotNone(follow_notification)
+        self.assertEqual(like_notification["target_post_id"], post.id)
+        self.assertIsNone(like_notification["target_comment_id"])
+        self.assertEqual(comment_notification["target_post_id"], post.id)
+        self.assertIsNotNone(comment_notification["target_comment_id"])
+        self.assertIsNone(follow_notification["target_post_id"])
+        self.assertEqual(follow_notification["actor"]["id"], self.charlie.id)

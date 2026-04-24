@@ -9,6 +9,8 @@ import Friends from "./pages/Friends";
 import FeedPage from "./pages/FeedPage";
 import NotificationPage from "./pages/NotificationPage";
 import ProfilePage from "./pages/ProfilePage";
+import PostDetailPage from "./pages/PostDetailPage";
+import SearchPage from "./pages/SearchPage";
 
 
 export default function App() {
@@ -36,6 +38,14 @@ export default function App() {
               </ProtectedRoute>
             }
           />
+          <Route
+            path="/search"
+            element={
+              <ProtectedRoute>
+                <SearchPage />
+              </ProtectedRoute>
+            }
+          />
 
           <Route
             path="/chat"
@@ -58,6 +68,14 @@ export default function App() {
             element={
               <ProtectedRoute>
                 <ProfilePage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/post/:postId"
+            element={
+              <ProtectedRoute>
+                <PostDetailPage />
               </ProtectedRoute>
             }
           />
