@@ -137,20 +137,6 @@ export default function Sidebar({
 
       {/* Users list */}
       <div className="sidebar-users">
-        <div className="chat-list-tabs">
-          <button
-            className={`btn btn-secondary small ${!showArchived ? "active" : ""}`}
-            onClick={() => setShowArchived?.(false)}
-          >
-            Inbox
-          </button>
-          <button
-            className={`btn btn-secondary small ${showArchived ? "active" : ""}`}
-            onClick={() => setShowArchived?.(true)}
-          >
-            Archived
-          </button>
-        </div>
         {users.map((u) => {
           const name = getDisplayName(u);
           const avatar = getAvatar(u);
@@ -264,6 +250,15 @@ export default function Sidebar({
                 <span className="slider round"></span>
               </label>
             </div>
+            <button
+              className="btn btn-secondary"
+              onClick={() => {
+                setShowArchived?.(!showArchived);
+                setShowSettings(false);
+              }}
+            >
+              {showArchived ? "Back to Inbox" : "View Archived"}
+            </button>
             <button
               className="btn btn-secondary"
               onClick={() => {
