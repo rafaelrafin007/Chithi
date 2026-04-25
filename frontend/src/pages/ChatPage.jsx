@@ -10,7 +10,9 @@ export default function ChatPage() {
   const { user } = useAuth();
   const chat = useChat(user);
   const [sidebarWidth, setSidebarWidth] = useState(280);
+  const [isHeaderMenuOpen, setIsHeaderMenuOpen] = useState(false);
   const isResizingRef = useRef(false);
+  const headerMenuRef = useRef(null);
 
   const fileLabel = (file, url) => {
     if (!file && !url) return "attachment";
@@ -53,6 +55,23 @@ export default function ChatPage() {
       window.removeEventListener("mouseup", handleUp);
     };
   }, []);
+
+  useEffect(() => {
+    const handleOutsideClick = (event) => {
+      if (!headerMenuRef.current) return;
+      if (headerMenuRef.current.contains(event.target)) return;
+      setIsHeaderMenuOpen(false);
+    };
+
+    document.addEventListener("pointerdown", handleOutsideClick);
+    return () => {
+      document.removeEventListener("pointerdown", handleOutsideClick);
+    };
+  }, []);
+
+  useEffect(() => {
+    setIsHeaderMenuOpen(false);
+  }, [selected?.id]);
 
   return (
     <div className="chat-container">
@@ -123,19 +142,49 @@ export default function ChatPage() {
                   </small>
                 )}
               </div>
-              <div style={{ marginLeft: "auto", display: "flex", gap: 8 }}>
+
+              <div className="chat-header-actions" ref={headerMenuRef}>
                 <button
-                  className="btn btn-secondary small"
-                  onClick={() => chat.setConversationMuted(selected.id, !selected.is_muted)}
+                  type="button"
+                  className="chat-header-overflow-btn"
+                  aria-label="Conversation actions"
+                  title="Conversation actions"
+                  aria-haspopup="menu"
+                  aria-expanded={isHeaderMenuOpen}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    setIsHeaderMenuOpen((prev) => !prev);
+                  }}
                 >
-                  {selected.is_muted ? "Unmute" : "Mute"}
+                  <span aria-hidden="true">•••</span>
                 </button>
-                <button
-                  className="btn btn-secondary small"
-                  onClick={() => chat.setConversationArchived(selected.id, !selected.is_archived)}
-                >
-                  {selected.is_archived ? "Unarchive" : "Archive"}
-                </button>
+
+                {isHeaderMenuOpen && (
+                  <div className="chat-header-menu" role="menu">
+                    <button
+                      type="button"
+                      className="chat-header-menu-item"
+                      role="menuitem"
+                      onClick={() => {
+                        chat.setConversationMuted(selected.id, !selected.is_muted);
+                        setIsHeaderMenuOpen(false);
+                      }}
+                    >
+                      {selected.is_muted ? "Unmute" : "Mute"}
+                    </button>
+                    <button
+                      type="button"
+                      className="chat-header-menu-item"
+                      role="menuitem"
+                      onClick={() => {
+                        chat.setConversationArchived(selected.id, !selected.is_archived);
+                        setIsHeaderMenuOpen(false);
+                      }}
+                    >
+                      {selected.is_archived ? "Unarchive" : "Archive"}
+                    </button>
+                  </div>
+                )}
               </div>
             </>
           ) : (
