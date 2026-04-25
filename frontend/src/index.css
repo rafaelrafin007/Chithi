@@ -411,6 +411,107 @@ body.light-theme .chat-user.active {
   font-weight: 600;
 }
 
+.chat-row-overflow {
+  position: relative;
+  display: flex;
+  align-items: center;
+  margin-left: 8px;
+  flex: 0 0 auto;
+}
+
+.chat-row-overflow-btn {
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.06);
+  color: #ececf6;
+  font-size: 0.95rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.16s ease, background 0.16s ease, border-color 0.16s ease;
+}
+
+.chat-row-overflow-btn span {
+  letter-spacing: 1px;
+  transform: translateY(-1px);
+}
+
+.chat-user:hover .chat-row-overflow-btn,
+.chat-row-overflow.open .chat-row-overflow-btn,
+.chat-row-overflow-btn:focus-visible {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.chat-row-overflow-btn:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.chat-row-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  min-width: 148px;
+  border-radius: 10px;
+  padding: 6px;
+  background: rgba(24, 24, 28, 0.98);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.45);
+  z-index: 35;
+  display: grid;
+  gap: 4px;
+}
+
+.chat-row-menu-item {
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: #f5f5f5;
+  text-align: left;
+  padding: 8px 10px;
+  cursor: pointer;
+}
+
+.chat-row-menu-item:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+body.light-theme .chat-row-overflow-btn {
+  background: rgba(17, 24, 39, 0.06);
+  border-color: rgba(17, 24, 39, 0.14);
+  color: #273041;
+}
+
+body.light-theme .chat-row-overflow-btn:hover {
+  background: rgba(17, 24, 39, 0.14);
+}
+
+body.light-theme .chat-row-menu {
+  background: rgba(255, 255, 255, 0.98);
+  border-color: rgba(17, 24, 39, 0.14);
+  box-shadow: 0 12px 24px rgba(17, 24, 39, 0.16);
+}
+
+body.light-theme .chat-row-menu-item {
+  color: #1f2937;
+}
+
+body.light-theme .chat-row-menu-item:hover {
+  background: rgba(17, 24, 39, 0.08);
+}
+
+@media (hover: none), (max-width: 900px) {
+  .chat-row-overflow-btn {
+    opacity: 1;
+    pointer-events: auto;
+  }
+}
+
 
 /* Unread highlight */
 body.light-theme .unread-highlight {

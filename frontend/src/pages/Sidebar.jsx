@@ -1,5 +1,5 @@
 // src/pages/Sidebar.jsx
-import React, { useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import ProfilePanel from "../pages/ProfilePanel";
@@ -25,7 +25,9 @@ export default function Sidebar({
   const { user, logout } = useAuth();
   const [showProfile, setShowProfile] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [openRowMenuId, setOpenRowMenuId] = useState(null);
   const nav = useNavigate();
+  const openRowMenuRef = useRef(null);
 
   const avatarUrl = user?.avatar_url || user?.profile?.avatar_url || null;
   const displayName = user?.display_name || user?.profile?.display_name || user?.username;
@@ -36,6 +38,18 @@ export default function Sidebar({
   const getAvatar = (u) => u?.avatar_url || u?.profile?.avatar_url || null;
 
   const initials = (str) => (str ? str[0].toUpperCase() : "U");
+
+  useEffect(() => {
+    const handleOutsideClick = (event) => {
+      if (!openRowMenuRef.current) return;
+      if (openRowMenuRef.current.contains(event.target)) return;
+      setOpenRowMenuId(null);
+    };
+    document.addEventListener("pointerdown", handleOutsideClick);
+    return () => {
+      document.removeEventListener("pointerdown", handleOutsideClick);
+    };
+  }, []);
 
   return (
     <div className="chat-sidebar" style={{ width }}>
@@ -107,7 +121,10 @@ export default function Sidebar({
             <div
               key={u.id}
               className={`chat-user ${isActive ? "active" : ""} ${u.unread > 0 && !u.is_muted ? "unread-highlight" : ""}`}
-              onClick={() => setSelected(u)}
+              onClick={() => {
+                setSelected(u);
+                setOpenRowMenuId(null);
+              }}
               style={{ display: "flex", gap: 10, alignItems: "center", padding: "10px 12px" }}
             >
               {/* Avatar */}
@@ -170,22 +187,48 @@ export default function Sidebar({
               </div>
 
               <div
-                className="chat-row-actions"
+                className={`chat-row-overflow ${openRowMenuId === u.id ? "open" : ""}`}
                 onClick={(e) => e.stopPropagation()}
-                style={{ display: "flex", flexDirection: "column", gap: 4 }}
+                ref={openRowMenuId === u.id ? openRowMenuRef : null}
               >
                 <button
-                  className="btn btn-secondary small"
-                  onClick={() => onMuteToggle?.(u.id, !u.is_muted)}
+                  type="button"
+                  className="chat-row-overflow-btn"
+                  aria-label="Conversation actions"
+                  title="Conversation actions"
+                  aria-haspopup="menu"
+                  aria-expanded={openRowMenuId === u.id}
+                  onClick={() => setOpenRowMenuId((prev) => (prev === u.id ? null : u.id))}
                 >
-                  {u.is_muted ? "Unmute" : "Mute"}
+                  <span aria-hidden="true">•••</span>
                 </button>
-                <button
-                  className="btn btn-secondary small"
-                  onClick={() => onArchiveToggle?.(u.id, !u.is_archived)}
-                >
-                  {u.is_archived ? "Unarchive" : "Archive"}
-                </button>
+
+                {openRowMenuId === u.id && (
+                  <div className="chat-row-menu" role="menu">
+                    <button
+                      type="button"
+                      className="chat-row-menu-item"
+                      role="menuitem"
+                      onClick={() => {
+                        onMuteToggle?.(u.id, !u.is_muted);
+                        setOpenRowMenuId(null);
+                      }}
+                    >
+                      {u.is_muted ? "Unmute" : "Mute"}
+                    </button>
+                    <button
+                      type="button"
+                      className="chat-row-menu-item"
+                      role="menuitem"
+                      onClick={() => {
+                        onArchiveToggle?.(u.id, !u.is_archived);
+                        setOpenRowMenuId(null);
+                      }}
+                    >
+                      {u.is_archived ? "Unarchive" : "Archive"}
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
           );
