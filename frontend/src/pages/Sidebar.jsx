@@ -232,12 +232,22 @@ export default function Sidebar({
 
       {/* Bottom settings area */}
       <div className="sidebar-bottom">
-        <button
-          className="btn btn-secondary"
-          onClick={() => setShowSettings((s) => !s)}
-        >
-          Settings
-        </button>
+        <div style={{ display: "flex", flexDirection: "column", gap: 8, width: "100%", alignItems: "center" }}>
+          {showArchived && (
+            <button
+              className="btn btn-secondary"
+              onClick={() => setShowArchived?.(false)}
+            >
+              Back to Inbox
+            </button>
+          )}
+          <button
+            className="btn btn-secondary"
+            onClick={() => setShowSettings((s) => !s)}
+          >
+            Settings
+          </button>
+        </div>
       </div>
 
       {showSettings && (
