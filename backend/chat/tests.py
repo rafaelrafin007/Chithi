@@ -200,6 +200,48 @@ class ChatConversationStateTests(APITestCase):
         self.assertIsNotNone(second_entry)
         self.assertTrue(second_entry["is_muted"])
 
+    def test_unmute_restores_normal_state(self):
+        self._auth(self.bob)
+        self.client.post(f"/api/chat/conversation/{self.alice.id}/mute/", {}, format="json")
+        unmute_response = self.client.post(f"/api/chat/conversation/{self.alice.id}/unmute/", {}, format="json")
+        self.assertEqual(unmute_response.status_code, status.HTTP_200_OK)
+
+        users = self._users_payload()
+        alice_entry = next((u for u in users if u["id"] == self.alice.id), None)
+        self.assertIsNotNone(alice_entry)
+        self.assertFalse(alice_entry["is_muted"])
+
+    def test_archive_works_when_muted(self):
+        Message.objects.create(sender=self.alice, receiver=self.bob, content="archive + mute")
+        self._auth(self.bob)
+
+        mute_response = self.client.post(f"/api/chat/conversation/{self.alice.id}/mute/", {}, format="json")
+        self.assertEqual(mute_response.status_code, status.HTTP_200_OK)
+
+        archive_response = self.client.post(f"/api/chat/conversation/{self.alice.id}/archive/", {}, format="json")
+        self.assertEqual(archive_response.status_code, status.HTTP_200_OK)
+
+        inbox_users = self._users_payload()
+        self.assertFalse(any(u["id"] == self.alice.id for u in inbox_users))
+
+        archived_users_response = self.client.get("/api/chat/users/?archived=1")
+        self.assertEqual(archived_users_response.status_code, status.HTTP_200_OK)
+        archived_entry = next((u for u in archived_users_response.data if u["id"] == self.alice.id), None)
+        self.assertIsNotNone(archived_entry)
+        self.assertTrue(archived_entry["is_muted"])
+
+    def test_state_endpoints_do_not_return_false_unavailable_when_table_exists(self):
+        self._auth(self.bob)
+        for url in [
+            f"/api/chat/conversation/{self.alice.id}/mute/",
+            f"/api/chat/conversation/{self.alice.id}/unmute/",
+            f"/api/chat/conversation/{self.alice.id}/archive/",
+            f"/api/chat/conversation/{self.alice.id}/unarchive/",
+            f"/api/chat/conversation/{self.alice.id}/read/",
+        ]:
+            response = self.client.post(url, {}, format="json")
+            self.assertNotEqual(response.status_code, status.HTTP_503_SERVICE_UNAVAILABLE)
+
     def test_conversation_list_returns_latest_message_and_unread_metadata(self):
         Message.objects.create(sender=self.alice, receiver=self.bob, content="older")
         Message.objects.create(sender=self.alice, receiver=self.bob, content="newer")

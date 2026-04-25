@@ -1,6 +1,7 @@
 from django.contrib.auth import get_user_model
 from django.db.models import Q
 from django.db.utils import OperationalError, ProgrammingError
+from django.db import connection
 from rest_framework import generics, status, permissions
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -18,16 +19,33 @@ from channels.layers import get_channel_layer
 User = get_user_model()
 
 
+def _is_missing_state_table_error(exc):
+    msg = str(exc).lower()
+    return "chat_conversationstate" in msg and ("no such table" in msg or "does not exist" in msg)
+
+
+def _conversation_state_table_available():
+    try:
+        return "chat_conversationstate" in connection.introspection.table_names()
+    except Exception:
+        return False
+
+
 def _get_or_create_state(user, other_user):
+    if not _conversation_state_table_available():
+        return None
     try:
         state, _ = ConversationState.objects.get_or_create(
             user=user,
             other_user=other_user,
         )
         return state
-    except (OperationalError, ProgrammingError):
+    except (OperationalError, ProgrammingError) as exc:
         # Backward compatibility for databases where chat state migration has not run yet.
-        return None
+        # Do not mask unrelated DB errors as "state unavailable".
+        if _is_missing_state_table_error(exc):
+            return None
+        raise
 
 
 def _mark_conversation_read(user, other_user):
@@ -106,10 +124,13 @@ class UsersListView(generics.ListAPIView):
                     "user_id", "last_read_at"
                 )
                 peer_last_read_map = {row["user_id"]: row["last_read_at"] for row in peer_state_qs}
-            except (OperationalError, ProgrammingError):
+            except (OperationalError, ProgrammingError) as exc:
                 # Legacy DBs without chat_conversationstate table should still list conversations.
-                state_map = {}
-                peer_last_read_map = {}
+                if _is_missing_state_table_error(exc):
+                    state_map = {}
+                    peer_last_read_map = {}
+                else:
+                    raise
 
         incoming_rows = Message.objects.filter(receiver=me, sender_id__in=friend_ids).values("sender_id", "timestamp")
         unread_count_map = {uid: 0 for uid in friend_ids}
@@ -190,8 +211,11 @@ class ConversationView(APIView):
         peer_state = None
         try:
             peer_state = ConversationState.objects.filter(user=other, other_user=request.user).only("last_read_at").first()
-        except (OperationalError, ProgrammingError):
-            peer_state = None
+        except (OperationalError, ProgrammingError) as exc:
+            if _is_missing_state_table_error(exc):
+                peer_state = None
+            else:
+                raise
         qs = Message.objects.filter(
             Q(sender=request.user, receiver=other)
             | Q(sender=other, receiver=request.user)

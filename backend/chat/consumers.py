@@ -17,6 +17,11 @@ ONLINE_USERS = set()
 ONLINE_LOCK = asyncio.Lock()
 
 
+def _is_missing_state_table_error(exc):
+    msg = str(exc).lower()
+    return "chat_conversationstate" in msg and ("no such table" in msg or "does not exist" in msg)
+
+
 class ChatConsumer(AsyncJsonWebsocketConsumer):
     """
     WebSocket consumer for chat.
@@ -463,8 +468,10 @@ class ChatConsumer(AsyncJsonWebsocketConsumer):
                 state.last_read_at = last_read_dt
                 state.save(update_fields=["last_read_at", "updated_at"])
             return state.last_read_at.isoformat()
-        except (OperationalError, ProgrammingError):
-            return None
+        except (OperationalError, ProgrammingError) as exc:
+            if _is_missing_state_table_error(exc):
+                return None
+            raise
 
     @database_sync_to_async
     def _touch_state_for_new_message(self, sender_id: int, receiver_id: int, message_ts):
@@ -492,8 +499,10 @@ class ChatConsumer(AsyncJsonWebsocketConsumer):
                 receiver_state.is_archived = False
                 receiver_state.archived_at = None
                 receiver_state.save(update_fields=["is_archived", "archived_at", "updated_at"])
-        except (OperationalError, ProgrammingError):
-            return
+        except (OperationalError, ProgrammingError) as exc:
+            if _is_missing_state_table_error(exc):
+                return
+            raise
 
     @database_sync_to_async
     def _edit_message(self, message_id: int, new_content: str):

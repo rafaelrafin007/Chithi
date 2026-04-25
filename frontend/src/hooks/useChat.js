@@ -211,6 +211,7 @@ export default function useChat(user) {
           has_blocked_me: !!u.has_blocked_me,
         }))
       );
+      setConversationError("");
     } catch (err) {
       console.error("Error fetching users:", err);
       setUsersError(err?.response?.data?.detail || "Unable to load chats right now.");
@@ -864,6 +865,7 @@ export default function useChat(user) {
 
   const setConversationArchived = async (userId, archived) => {
     if (!userId) return;
+    setConversationError("");
     try {
       if (archived) await archiveConversation(userId);
       else await unarchiveConversation(userId);
@@ -882,6 +884,7 @@ export default function useChat(user) {
         setMessages([]);
       }
       await fetchUsers();
+      setConversationError("");
     } catch (err) {
       console.error("Failed to update archive state", err);
       setConversationError(err?.response?.data?.detail || "Unable to update archive state.");
@@ -890,6 +893,7 @@ export default function useChat(user) {
 
   const setConversationMuted = async (userId, muted) => {
     if (!userId) return;
+    setConversationError("");
     try {
       if (muted) await muteConversation(userId);
       else await unmuteConversation(userId);
