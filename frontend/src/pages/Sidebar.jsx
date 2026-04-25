@@ -5,7 +5,24 @@ import { useAuth } from "../context/AuthContext";
 import ProfilePanel from "../pages/ProfilePanel";
 import useNotificationCount from "../hooks/useNotificationCount";
 
-export default function Sidebar({ users, selected, setSelected, theme, toggleTheme, width }) {
+function formatListTime(timestamp) {
+  if (!timestamp) return "";
+  const date = new Date(timestamp);
+  return date.toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
+}
+
+export default function Sidebar({
+  users,
+  selected,
+  setSelected,
+  theme,
+  toggleTheme,
+  width,
+  showArchived = false,
+  setShowArchived,
+  onArchiveToggle,
+  onMuteToggle,
+}) {
   const { user, logout } = useAuth();
   const { unreadCount } = useNotificationCount(!!user?.id);
   const [showProfile, setShowProfile] = useState(false);
@@ -120,6 +137,20 @@ export default function Sidebar({ users, selected, setSelected, theme, toggleThe
 
       {/* Users list */}
       <div className="sidebar-users">
+        <div className="chat-list-tabs">
+          <button
+            className={`btn btn-secondary small ${!showArchived ? "active" : ""}`}
+            onClick={() => setShowArchived?.(false)}
+          >
+            Inbox
+          </button>
+          <button
+            className={`btn btn-secondary small ${showArchived ? "active" : ""}`}
+            onClick={() => setShowArchived?.(true)}
+          >
+            Archived
+          </button>
+        </div>
         {users.map((u) => {
           const name = getDisplayName(u);
           const avatar = getAvatar(u);
@@ -127,7 +158,7 @@ export default function Sidebar({ users, selected, setSelected, theme, toggleThe
           return (
             <div
               key={u.id}
-              className={`chat-user ${isActive ? "active" : ""} ${u.unread > 0 ? "unread-highlight" : ""}`}
+              className={`chat-user ${isActive ? "active" : ""} ${u.unread > 0 && !u.is_muted ? "unread-highlight" : ""}`}
               onClick={() => setSelected(u)}
               style={{ display: "flex", gap: 10, alignItems: "center", padding: "10px 12px" }}
             >
@@ -167,19 +198,46 @@ export default function Sidebar({ users, selected, setSelected, theme, toggleThe
                   >
                     {name}
                   </span>
+                  {u.is_muted && <span className="friends-chip">Muted</span>}
+                  {u.is_blocked_by_me && <span className="friends-chip blocked">Blocked</span>}
+                  {u.has_blocked_me && <span className="friends-chip blocked">Blocked you</span>}
                   {u.unread > 0 && <span className="unread-badge">{u.unread}</span>}
                 </div>
 
-                {u.last_message?.content && (
+                {(u.last_message?.content || u.last_message?.attachment_url) && (
                   <small
                     className={`last-msg ${u.unread > 0 ? "bold-username" : ""}`}
                     style={{ display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
                   >
-                    {u.last_message.content.length > 40
-                      ? u.last_message.content.slice(0, 40) + "..."
-                      : u.last_message.content}
+                    {u.last_message.content
+                      ? (u.last_message.content.length > 40
+                        ? u.last_message.content.slice(0, 40) + "..."
+                        : u.last_message.content)
+                      : "Sent an attachment"}
                   </small>
                 )}
+                {u.last_message?.timestamp && (
+                  <small className="chat-row-time">{formatListTime(u.last_message.timestamp)}</small>
+                )}
+              </div>
+
+              <div
+                className="chat-row-actions"
+                onClick={(e) => e.stopPropagation()}
+                style={{ display: "flex", flexDirection: "column", gap: 4 }}
+              >
+                <button
+                  className="btn btn-secondary small"
+                  onClick={() => onMuteToggle?.(u.id, !u.is_muted)}
+                >
+                  {u.is_muted ? "Unmute" : "Mute"}
+                </button>
+                <button
+                  className="btn btn-secondary small"
+                  onClick={() => onArchiveToggle?.(u.id, !u.is_archived)}
+                >
+                  {u.is_archived ? "Unarchive" : "Archive"}
+                </button>
               </div>
             </div>
           );

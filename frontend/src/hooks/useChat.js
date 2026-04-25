@@ -1,6 +1,15 @@
 // src/hooks/useChat.js
 import { useEffect, useState, useRef, useCallback } from "react";
-import api, { sendMessage, getApiBaseUrl } from "../services/api";
+import api, {
+  sendMessage,
+  getApiBaseUrl,
+  getUsers,
+  getConversation,
+  archiveConversation,
+  unarchiveConversation,
+  muteConversation,
+  unmuteConversation,
+} from "../services/api";
 
 /**
  * useChat(user)
@@ -17,10 +26,19 @@ export default function useChat(user) {
   const [messages, setMessages] = useState([]);
   const [text, setText] = useState("");
   const [typing, setTyping] = useState(false);
+  const [showArchived, setShowArchived] = useState(false);
+  const [sendError, setSendError] = useState("");
+  const [conversationError, setConversationError] = useState("");
+  const [usersError, setUsersError] = useState("");
 
   const messagesEndRef = useRef(null);
   const wsRef = useRef(null);
   const latestMessagesRef = useRef([]);
+  const latestUsersRef = useRef([]);
+  const selectedRef = useRef(null);
+  const conversationFetchInFlightRef = useRef(false);
+  const lastFetchedConversationIdRef = useRef(null);
+  const lastReadSentRef = useRef("");
   const typingTimeoutRef = useRef(null);
   const lastTypingSentRef = useRef(0);
   const deliveredAcksRef = useRef(new Set());
@@ -119,14 +137,43 @@ export default function useChat(user) {
     latestMessagesRef.current = messages;
   }, [messages]);
 
+  useEffect(() => {
+    latestUsersRef.current = users;
+  }, [users]);
+
+  useEffect(() => {
+    selectedRef.current = selected;
+  }, [selected]);
+
   const toggleTheme = useCallback(() => {
     setTheme((prev) => (prev === "dark" ? "light" : "dark"));
   }, []);
 
   // --- Fetch Users ---
+  const mergeSelectedIfChanged = useCallback((prev, refreshed) => {
+    if (!prev || !refreshed) return prev;
+    const trackedKeys = [
+      "id",
+      "username",
+      "display_name",
+      "avatar_url",
+      "is_online",
+      "is_archived",
+      "is_muted",
+      "can_message",
+      "is_blocked_by_me",
+      "has_blocked_me",
+      "unread",
+    ];
+    const changed = trackedKeys.some((key) => prev[key] !== refreshed[key]);
+    if (!changed) return prev;
+    return { ...prev, ...refreshed };
+  }, []);
+
   const fetchUsers = useCallback(async () => {
     try {
-      const { data } = await api.get("/api/chat/users/");
+      setUsersError("");
+      const { data } = await getUsers({ archived: showArchived ? 1 : 0 });
       // Normalize incoming users
       const normalized = (Array.isArray(data) ? data : []).map(normalizeUser);
       const sorted = [...normalized].sort((a, b) => {
@@ -140,13 +187,35 @@ export default function useChat(user) {
       if (savedId) {
         initialSelected = sorted.find((u) => u.id?.toString() === savedId);
       }
-      if (!selected) setSelected(initialSelected || (sorted.length ? sorted[0] : null));
-      setUsers(sorted.map((u) => ({ ...u, unread: u.unread || 0, is_online: u.is_online || false })));
+      const currentSelected = selectedRef.current;
+      const hasCurrentSelected = currentSelected ? sorted.some((u) => u.id === currentSelected.id) : false;
+      if (!hasCurrentSelected) {
+        setSelected(initialSelected || (sorted.length ? sorted[0] : null));
+      } else {
+        setSelected((prev) => {
+          if (!prev) return prev;
+          const refreshed = sorted.find((u) => u.id === prev.id);
+          if (!refreshed) return prev;
+          return mergeSelectedIfChanged(prev, refreshed);
+        });
+      }
+      setUsers(
+        sorted.map((u) => ({
+          ...u,
+          unread: u.unread || 0,
+          is_online: u.is_online || false,
+          is_archived: !!u.is_archived,
+          is_muted: !!u.is_muted,
+          can_message: u.can_message !== false,
+          is_blocked_by_me: !!u.is_blocked_by_me,
+          has_blocked_me: !!u.has_blocked_me,
+        }))
+      );
     } catch (err) {
       console.error("Error fetching users:", err);
+      setUsersError(err?.response?.data?.detail || "Unable to load chats right now.");
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selected]);
+  }, [mergeSelectedIfChanged, showArchived]);
 
   // --- Format Timestamp ---
   const formatTimestamp = useCallback((timestamp) => {
@@ -260,23 +329,45 @@ export default function useChat(user) {
   };
 
   // --- Fetch Conversation ---
+  const sendReadReceiptIfNeeded = useCallback((timestamp) => {
+    if (!timestamp) return;
+    if (lastReadSentRef.current === timestamp) return;
+    lastReadSentRef.current = timestamp;
+    sendWhenWsReady({ type: "read", last_read: timestamp });
+  }, []);
+
   const fetchConversation = useCallback(async () => {
-    if (!selected) return;
+    const currentSelected = selectedRef.current;
+    if (!currentSelected?.id) return;
+    if (conversationFetchInFlightRef.current && lastFetchedConversationIdRef.current === currentSelected.id) {
+      return;
+    }
+    conversationFetchInFlightRef.current = true;
+    lastFetchedConversationIdRef.current = currentSelected.id;
     try {
-      const { data } = await api.get(`/api/chat/conversation/${selected.id}/`);
-      setMessages(data);
+      setConversationError("");
+      const { data } = await getConversation(currentSelected.id, { mark_read: 1 });
+      if (selectedRef.current?.id !== currentSelected.id) {
+        return;
+      }
+      const nextMessages = Array.isArray(data) ? data : [];
+      setMessages(nextMessages);
       scrollToBottom();
 
-      if (data.length) {
-        const lastTs = data[data.length - 1].timestamp;
-        sendWhenWsReady({ type: "read", last_read: lastTs });
+      if (nextMessages.length) {
+        const lastTs = nextMessages[nextMessages.length - 1].timestamp;
+        sendReadReceiptIfNeeded(lastTs);
       }
 
-      setUsers((prev) => prev.map((u) => (u.id === selected.id ? { ...u, unread: 0 } : u)));
+      setUsers((prev) => prev.map((u) => (u.id === currentSelected.id ? { ...u, unread: 0 } : u)));
     } catch (err) {
       console.error("Error fetching conversation:", err);
+      setConversationError(err?.response?.data?.detail || "Unable to load this conversation.");
+      setMessages([]);
+    } finally {
+      conversationFetchInFlightRef.current = false;
     }
-  }, [selected]);
+  }, [sendReadReceiptIfNeeded]);
 
   // --- WebSocket lifecycle ---
   useEffect(() => {
@@ -311,13 +402,18 @@ export default function useChat(user) {
           const latestMessages = latestMessagesRef.current;
           if (latestMessages.length) {
             const lastTs = latestMessages[latestMessages.length - 1].timestamp;
-            sendWhenWsReady({ type: "read", last_read: lastTs });
+            sendReadReceiptIfNeeded(lastTs);
           }
         };
 
         ws.onmessage = (evt) => {
           try {
             const payload = JSON.parse(evt.data);
+
+        if (payload?.type === "error") {
+          setSendError(payload?.detail || "Unable to send message.");
+          return;
+        }
 
         if (payload?.type === "presence") {
           const { user: presenceUserId, online } = payload;
@@ -442,7 +538,12 @@ export default function useChat(user) {
               sendWhenWsReady({ type: "delivered", message_id: msg.id });
             }
             if (msg.sender?.id !== user?.id) {
-              showDesktopNotification(msg);
+              const targetConversation = latestUsersRef.current.find((u) => u.id === targetId);
+              const mutedConversation = !!targetConversation?.is_muted;
+              if (!mutedConversation) {
+                showDesktopNotification(msg);
+              }
+              sendReadReceiptIfNeeded(msg.timestamp);
             }
             scrollToBottom();
           }
@@ -573,7 +674,13 @@ export default function useChat(user) {
 
   // --- Send Message ---
   const send = async () => {
+    if (!selected) return;
+    if (selected.can_message === false) {
+      setSendError("Messaging is unavailable because one user has blocked the other.");
+      return;
+    }
     if ((!text || !text.trim()) && !selectedFile) return;
+    setSendError("");
     const content = text.trim();
 
     // If there is an attachment -> always send via REST (multipart)
@@ -623,10 +730,12 @@ export default function useChat(user) {
       // Clear input & attachment
       setText("");
       removeAttachment();
+      setSendError("");
 
       scrollToBottom();
     } catch (err) {
       console.error("Error sending via REST:", err);
+      setSendError(err?.response?.data?.detail || "Unable to send message.");
     }
   };
 
@@ -733,12 +842,65 @@ export default function useChat(user) {
   }, [fetchUsers]);
 
   useEffect(() => {
+    if (!selected?.id) {
+      setMessages([]);
+      return;
+    }
+    if (lastFetchedConversationIdRef.current === selected.id && conversationFetchInFlightRef.current) {
+      return;
+    }
     fetchConversation();
-  }, [fetchConversation]);
+  }, [selected?.id, fetchConversation]);
+
+  useEffect(() => {
+    setSendError("");
+    setConversationError("");
+    lastReadSentRef.current = "";
+  }, [selected?.id]);
 
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
+
+  const setConversationArchived = async (userId, archived) => {
+    if (!userId) return;
+    try {
+      if (archived) await archiveConversation(userId);
+      else await unarchiveConversation(userId);
+      setUsers((prev) => {
+        const next = prev
+          .map((u) => (u.id === userId ? { ...u, is_archived: archived } : u))
+          .filter((u) => (showArchived ? !!u.is_archived : !u.is_archived));
+        return next;
+      });
+      if (selected?.id === userId && archived && !showArchived) {
+        setSelected(null);
+        setMessages([]);
+      }
+      if (selected?.id === userId && !archived && showArchived) {
+        setSelected(null);
+        setMessages([]);
+      }
+      await fetchUsers();
+    } catch (err) {
+      console.error("Failed to update archive state", err);
+      setConversationError(err?.response?.data?.detail || "Unable to update archive state.");
+    }
+  };
+
+  const setConversationMuted = async (userId, muted) => {
+    if (!userId) return;
+    try {
+      if (muted) await muteConversation(userId);
+      else await unmuteConversation(userId);
+      setUsers((prev) => prev.map((u) => (u.id === userId ? { ...u, is_muted: muted } : u)));
+      setSelected((prev) => (prev && prev.id === userId ? { ...prev, is_muted: muted } : prev));
+      setConversationError("");
+    } catch (err) {
+      console.error("Failed to update mute state", err);
+      setConversationError(err?.response?.data?.detail || "Unable to update mute state.");
+    }
+  };
 
   return {
     // state
@@ -748,6 +910,10 @@ export default function useChat(user) {
     messages,
     text,
     typing,
+    showArchived,
+    sendError,
+    conversationError,
+    usersError,
     menuOpenFor,
     editingMessageId,
     editingText,
@@ -761,6 +927,7 @@ export default function useChat(user) {
     setText,
     setMenuOpenFor,
     setEditingText,
+    setShowArchived,
     toggleTheme,
     // attachment handlers
     handleFileChange,
@@ -776,5 +943,7 @@ export default function useChat(user) {
     deleteMessage,
     fetchUsers,
     fetchConversation,
+    setConversationArchived,
+    setConversationMuted,
   };
 }

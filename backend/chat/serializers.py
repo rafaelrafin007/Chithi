@@ -5,6 +5,7 @@ from .models import Message, MessageReaction
 from django.db.models import Q
 import os
 import mimetypes
+from django.utils.dateparse import parse_datetime
 
 User = get_user_model()
 
@@ -17,6 +18,8 @@ class MessageSerializer(serializers.ModelSerializer):
     attachment_name = serializers.SerializerMethodField()
     attachment_type = serializers.SerializerMethodField()
     reactions = serializers.SerializerMethodField()
+    read = serializers.SerializerMethodField()
+    delivered = serializers.SerializerMethodField()
 
     class Meta:
         model = Message
@@ -33,6 +36,8 @@ class MessageSerializer(serializers.ModelSerializer):
             "attachment_name",
             "attachment_type",
             "reactions",
+            "read",
+            "delivered",
         )
 
     def _build_absolute(self, url):
@@ -123,15 +128,65 @@ class MessageSerializer(serializers.ModelSerializer):
             entry["users"].append(user_id)
         return list(by_emoji.values())
 
+    def get_read(self, obj):
+        value = getattr(obj, "read", None)
+        if value is not None:
+            return bool(value)
+
+        request = self.context.get("request")
+        viewer = getattr(request, "user", None)
+        if not viewer or not viewer.is_authenticated:
+            return False
+
+        # Incoming messages are considered read by definition for the current viewer.
+        if obj.sender_id != viewer.id:
+            return True
+
+        peer_last_read_at = self.context.get("peer_last_read_at")
+        if peer_last_read_at is None:
+            peer_last_read_map = self.context.get("peer_last_read_map") or {}
+            peer_last_read_at = peer_last_read_map.get(obj.receiver_id)
+        if isinstance(peer_last_read_at, str):
+            peer_last_read_at = parse_datetime(peer_last_read_at)
+        if not peer_last_read_at:
+            return False
+        return obj.timestamp <= peer_last_read_at
+
+    def get_delivered(self, obj):
+        value = getattr(obj, "delivered", None)
+        if value is not None:
+            return bool(value)
+        return True
+
 
 class UserLiteSerializer(serializers.ModelSerializer):
     last_message = serializers.SerializerMethodField()
+    last_message_at = serializers.SerializerMethodField()
     display_name = serializers.SerializerMethodField()
     avatar_url = serializers.SerializerMethodField()
+    unread = serializers.SerializerMethodField()
+    is_archived = serializers.SerializerMethodField()
+    is_muted = serializers.SerializerMethodField()
+    is_blocked_by_me = serializers.SerializerMethodField()
+    has_blocked_me = serializers.SerializerMethodField()
+    can_message = serializers.SerializerMethodField()
 
     class Meta:
         model = User
-        fields = ("id", "username", "display_name", "avatar_url", "last_message")
+        fields = (
+            "id",
+            "username",
+            "display_name",
+            "avatar_url",
+            "last_message",
+            "last_message_at",
+            "unread",
+            "is_archived",
+            "is_muted",
+            "is_blocked_by_me",
+            "has_blocked_me",
+            "can_message",
+        )
 
     def _build_absolute(self, url):
         if not url:
@@ -171,23 +226,55 @@ class UserLiteSerializer(serializers.ModelSerializer):
         return self._build_absolute(url) if url else None
 
     def get_last_message(self, obj):
-        # context may include 'request' and/or 'base_url'
-        request = self.context.get("request")
-        if not request or not request.user.is_authenticated:
-            # still attempt to fetch last message, but if no authenticated request available,
-            # skip to be safe
-            # However previous behavior returned None if no request authenticated; keep that.
-            return None
-
-        msg = (
-            Message.objects.filter(
-                Q(sender=request.user, receiver=obj)
-                | Q(sender=obj, receiver=request.user)
+        message_map = self.context.get("last_message_map") or {}
+        msg = message_map.get(obj.id)
+        if msg is None:
+            request = self.context.get("request")
+            if not request or not request.user.is_authenticated:
+                return None
+            msg = (
+                Message.objects.filter(
+                    Q(sender=request.user, receiver=obj)
+                    | Q(sender=obj, receiver=request.user)
+                )
+                .order_by("-timestamp")
+                .first()
             )
-            .order_by("-timestamp")
-            .first()
-        )
         if not msg:
             return None
-        # include same context so attachment/avatar urls are absolute when possible
-        return MessageSerializer(msg, context=self.context).data if msg else None
+        serializer_context = dict(self.context)
+        peer_last_read_map = self.context.get("peer_last_read_map") or {}
+        serializer_context["peer_last_read_at"] = peer_last_read_map.get(obj.id)
+        return MessageSerializer(msg, context=serializer_context).data
+
+    def get_last_message_at(self, obj):
+        message_map = self.context.get("last_message_map") or {}
+        msg = message_map.get(obj.id)
+        return getattr(msg, "timestamp", None) if msg else None
+
+    def get_unread(self, obj):
+        unread_map = self.context.get("unread_count_map") or {}
+        return int(unread_map.get(obj.id, 0))
+
+    def _state_for(self, obj):
+        state_map = self.context.get("conversation_state_map") or {}
+        return state_map.get(obj.id)
+
+    def get_is_archived(self, obj):
+        state = self._state_for(obj)
+        return bool(getattr(state, "is_archived", False))
+
+    def get_is_muted(self, obj):
+        state = self._state_for(obj)
+        return bool(getattr(state, "is_muted", False))
+
+    def get_is_blocked_by_me(self, obj):
+        ids = self.context.get("blocked_by_me_ids") or set()
+        return obj.id in ids
+
+    def get_has_blocked_me(self, obj):
+        ids = self.context.get("blocked_me_ids") or set()
+        return obj.id in ids
+
+    def get_can_message(self, obj):
+        return not self.get_is_blocked_by_me(obj) and not self.get_has_blocked_me(obj)

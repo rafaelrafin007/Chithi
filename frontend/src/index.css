@@ -257,6 +257,30 @@ body.light-theme .friends-kicker {
   padding-bottom: 70px;
 }
 
+.chat-list-tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.chat-row-time {
+  display: block;
+  opacity: 0.65;
+  font-size: 0.75rem;
+  margin-top: 2px;
+}
+
+.chat-inline-error {
+  color: #ff9c9c;
+  font-size: 0.9rem;
+}
+
+.chat-empty-state {
+  padding: 12px;
+  font-size: 0.9rem;
+  opacity: 0.75;
+}
+
 .sidebar-bottom {
   position: absolute;
   left: 0;

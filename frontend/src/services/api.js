@@ -18,8 +18,14 @@ api.interceptors.request.use((config) => {
 });
 
 // ---- Chat helper methods (optional, cleaner usage) ----
-export const getUsers = () => api.get("/api/chat/users/");
-export const getConversation = (userId) => api.get(`/api/chat/conversation/${userId}/`);
+export const getUsers = (params = {}) => api.get("/api/chat/users/", { params });
+export const getConversation = (userId, params = {}) =>
+  api.get(`/api/chat/conversation/${userId}/`, { params });
+export const markConversationRead = (userId) => api.post(`/api/chat/conversation/${userId}/read/`);
+export const archiveConversation = (userId) => api.post(`/api/chat/conversation/${userId}/archive/`);
+export const unarchiveConversation = (userId) => api.post(`/api/chat/conversation/${userId}/unarchive/`);
+export const muteConversation = (userId) => api.post(`/api/chat/conversation/${userId}/mute/`);
+export const unmuteConversation = (userId) => api.post(`/api/chat/conversation/${userId}/unmute/`);
 
 /**
  * sendMessage(receiverId, content, file)

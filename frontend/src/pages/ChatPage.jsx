@@ -27,6 +27,12 @@ export default function ChatPage() {
   const initials = (s) => (s ? s[0].toUpperCase() : "U");
 
   const selected = chat.selected;
+  const isMessagingBlocked = !!selected && selected.can_message === false;
+  const blockedReason = selected?.is_blocked_by_me
+    ? "You blocked this user. Unblock from profile or friends page to send messages."
+    : selected?.has_blocked_me
+      ? "This user has blocked you. Messaging is unavailable."
+      : "Messaging is unavailable for this conversation.";
 
   useEffect(() => {
     const handleMove = (e) => {
@@ -57,6 +63,10 @@ export default function ChatPage() {
         theme={chat.theme}
         toggleTheme={chat.toggleTheme}
         width={sidebarWidth}
+        showArchived={chat.showArchived}
+        setShowArchived={chat.setShowArchived}
+        onArchiveToggle={chat.setConversationArchived}
+        onMuteToggle={chat.setConversationMuted}
       />
 
       <div
@@ -101,8 +111,26 @@ export default function ChatPage() {
               <div>
                 <h3 style={{ margin: 0 }}>{getDisplayName(selected)}</h3>
                 {selected && (
-                  <small style={{ opacity: 0.7 }}>{selected.is_online ? "Online" : "Offline"}</small>
+                  <small style={{ opacity: 0.7 }}>
+                    {selected.is_online ? "Online" : "Offline"}
+                    {selected.is_muted ? " • Muted" : ""}
+                    {selected.is_archived ? " • Archived" : ""}
+                  </small>
                 )}
+              </div>
+              <div style={{ marginLeft: "auto", display: "flex", gap: 8 }}>
+                <button
+                  className="btn btn-secondary small"
+                  onClick={() => chat.setConversationMuted(selected.id, !selected.is_muted)}
+                >
+                  {selected.is_muted ? "Unmute" : "Mute"}
+                </button>
+                <button
+                  className="btn btn-secondary small"
+                  onClick={() => chat.setConversationArchived(selected.id, !selected.is_archived)}
+                >
+                  {selected.is_archived ? "Unarchive" : "Archive"}
+                </button>
               </div>
             </>
           ) : (
@@ -110,7 +138,29 @@ export default function ChatPage() {
           )}
         </div>
 
+        {chat.conversationError && (
+          <div className="chat-inline-error" style={{ padding: "8px 12px" }}>
+            {chat.conversationError}
+          </div>
+        )}
+        {chat.usersError && (
+          <div className="chat-inline-error" style={{ padding: "8px 12px" }}>
+            {chat.usersError}
+          </div>
+        )}
+        {isMessagingBlocked && (
+          <div className="chat-inline-error" style={{ padding: "8px 12px" }}>
+            {blockedReason}
+          </div>
+        )}
+
         <div className="chat-messages">
+          {!chat.selected && !chat.usersError && (
+            <div className="chat-empty-state">Select a conversation to start chatting.</div>
+          )}
+          {chat.selected && chat.messages.length === 0 && !chat.conversationError && (
+            <div className="chat-empty-state">No messages yet in this conversation.</div>
+          )}
           {chat.messages.map((m) => {
             const mine = m.sender?.id === user?.id;
             return (
@@ -190,19 +240,30 @@ export default function ChatPage() {
               onClick={() => document.getElementById("chat-attach-input")?.click()}
               title="Attach a file"
               className="attach-btn"
+              disabled={!selected || isMessagingBlocked}
             >
               +
             </button>
 
             <input
-              placeholder="Type a message..."
+              placeholder={
+                !selected
+                  ? "Select a user to start chatting..."
+                  : isMessagingBlocked
+                    ? "Messaging unavailable due to block status"
+                    : "Type a message..."
+              }
               value={chat.text}
               onChange={chat.handleTyping}
               onKeyDown={(e) => e.key === "Enter" && chat.send()}
               className="message-input"
+              disabled={!selected || isMessagingBlocked}
             />
-            <button onClick={chat.send}>Send</button>
+            <button onClick={chat.send} disabled={!selected || isMessagingBlocked}>
+              Send
+            </button>
           </div>
+          {chat.sendError && <div className="chat-inline-error">{chat.sendError}</div>}
         </div>
       </div>
     </div>

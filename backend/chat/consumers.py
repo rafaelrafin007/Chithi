@@ -3,6 +3,10 @@ import json
 import logging
 import asyncio
 from urllib.parse import parse_qs
+from django.utils.dateparse import parse_datetime
+from django.utils import timezone
+from django.db.models import Q
+from django.db.utils import OperationalError, ProgrammingError
 
 from channels.generic.websocket import AsyncJsonWebsocketConsumer
 from channels.db import database_sync_to_async
@@ -115,18 +119,19 @@ class ChatConsumer(AsyncJsonWebsocketConsumer):
         if event_type == "read":
             last_read = content.get("last_read")
             if last_read:
+                recorded_last_read = await self._record_read_state(self.user.id, self.other_user_id, last_read)
                 await self.channel_layer.group_send(
                     self.room_group_name,
-                    {"type": "chat.read", "user": self.user.id, "last_read": last_read},
+                    {"type": "chat.read", "user": self.user.id, "last_read": recorded_last_read or last_read},
                 )
                 # notify both participants by personal group so sender sees read even if not in the room
                 await self.channel_layer.group_send(
                     f"user_{self.user.id}",
-                    {"type": "chat.read", "user": self.user.id, "last_read": last_read},
+                    {"type": "chat.read", "user": self.user.id, "last_read": recorded_last_read or last_read},
                 )
                 await self.channel_layer.group_send(
                     f"user_{self.other_user_id}",
-                    {"type": "chat.read", "user": self.user.id, "last_read": last_read},
+                    {"type": "chat.read", "user": self.user.id, "last_read": recorded_last_read or last_read},
                 )
             return
 
@@ -214,9 +219,19 @@ class ChatConsumer(AsyncJsonWebsocketConsumer):
         other = await self._get_user(self.other_user_id)
         if not other:
             return
+        if await self._is_blocked_between(self.user.id, self.other_user_id):
+            await self.send_json(
+                {
+                    "type": "error",
+                    "code": "blocked",
+                    "detail": "Messaging is unavailable because one user has blocked the other.",
+                }
+            )
+            return
 
         # create message in DB (note: your Message model uses `timestamp` auto_now_add)
         msg = await self._create_message(self.user, other, text)
+        await self._touch_state_for_new_message(self.user.id, other.id, msg.timestamp.isoformat())
         payload = await self._serialize_message(msg)
 
         # Broadcast canonical message to conversation room
@@ -349,6 +364,14 @@ class ChatConsumer(AsyncJsonWebsocketConsumer):
         return Message.objects.create(sender=sender, receiver=receiver, content=content)
 
     @database_sync_to_async
+    def _is_blocked_between(self, user_a_id: int, user_b_id: int):
+        from users.models import Block
+        return Block.objects.filter(
+            Q(blocker_id=user_a_id, blocked_id=user_b_id)
+            | Q(blocker_id=user_b_id, blocked_id=user_a_id)
+        ).exists()
+
+    @database_sync_to_async
     def _serialize_message(self, message):
         """
         Serialize a Message instance into the same JSON that the REST API
@@ -425,6 +448,52 @@ class ChatConsumer(AsyncJsonWebsocketConsumer):
             return {"action": "switched", "emoji": emoji, "old_emoji": old_emoji}
         MessageReaction.objects.create(message_id=message_id, user_id=user_id, emoji=emoji)
         return {"action": "added", "emoji": emoji, "old_emoji": None}
+
+    @database_sync_to_async
+    def _record_read_state(self, user_id: int, other_user_id: int, last_read):
+        from .models import ConversationState
+        last_read_dt = parse_datetime(last_read) if isinstance(last_read, str) else last_read
+        if last_read_dt is None:
+            return None
+        if timezone.is_naive(last_read_dt):
+            last_read_dt = timezone.make_aware(last_read_dt, timezone.get_current_timezone())
+        try:
+            state, _ = ConversationState.objects.get_or_create(user_id=user_id, other_user_id=other_user_id)
+            if not state.last_read_at or last_read_dt > state.last_read_at:
+                state.last_read_at = last_read_dt
+                state.save(update_fields=["last_read_at", "updated_at"])
+            return state.last_read_at.isoformat()
+        except (OperationalError, ProgrammingError):
+            return None
+
+    @database_sync_to_async
+    def _touch_state_for_new_message(self, sender_id: int, receiver_id: int, message_ts):
+        from .models import ConversationState
+        ts = parse_datetime(message_ts) if isinstance(message_ts, str) else message_ts
+        if ts is None:
+            ts = timezone.now()
+        if timezone.is_naive(ts):
+            ts = timezone.make_aware(ts, timezone.get_current_timezone())
+        try:
+            sender_state, _ = ConversationState.objects.get_or_create(user_id=sender_id, other_user_id=receiver_id)
+            sender_changed = []
+            if not sender_state.last_read_at or ts > sender_state.last_read_at:
+                sender_state.last_read_at = ts
+                sender_changed.append("last_read_at")
+            if sender_state.is_archived:
+                sender_state.is_archived = False
+                sender_state.archived_at = None
+                sender_changed.extend(["is_archived", "archived_at"])
+            if sender_changed:
+                sender_state.save(update_fields=sender_changed + ["updated_at"])
+
+            receiver_state, _ = ConversationState.objects.get_or_create(user_id=receiver_id, other_user_id=sender_id)
+            if receiver_state.is_archived:
+                receiver_state.is_archived = False
+                receiver_state.archived_at = None
+                receiver_state.save(update_fields=["is_archived", "archived_at", "updated_at"])
+        except (OperationalError, ProgrammingError):
+            return
 
     @database_sync_to_async
     def _edit_message(self, message_id: int, new_content: str):
