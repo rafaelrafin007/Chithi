@@ -4,6 +4,7 @@ import { useAuth } from "../context/AuthContext";
 import Sidebar from "./Sidebar";
 import MessageBubble from "./MessageBubble";
 import useChat from "../hooks/useChat";
+import SocialNav from "../components/SocialNav";
 
 export default function ChatPage() {
   const { user } = useAuth();
@@ -78,6 +79,10 @@ export default function ChatPage() {
 
       {/* Chat Window */}
       <div className="chat-window">
+        <div className="chat-top-nav">
+          <SocialNav className="chat-top-nav-strip" variant="icon-only" />
+        </div>
+
         <div className="chat-header" style={{ display: "flex", alignItems: "center", gap: 12 }}>
           {selected ? (
             <>
@@ -113,8 +118,8 @@ export default function ChatPage() {
                 {selected && (
                   <small style={{ opacity: 0.7 }}>
                     {selected.is_online ? "Online" : "Offline"}
-                    {selected.is_muted ? " • Muted" : ""}
-                    {selected.is_archived ? " • Archived" : ""}
+                    {selected.is_muted ? " | Muted" : ""}
+                    {selected.is_archived ? " | Archived" : ""}
                   </small>
                 )}
               </div>

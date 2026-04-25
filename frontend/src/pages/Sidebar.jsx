@@ -1,9 +1,8 @@
 // src/pages/Sidebar.jsx
 import React, { useState } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import ProfilePanel from "../pages/ProfilePanel";
-import useNotificationCount from "../hooks/useNotificationCount";
 
 function formatListTime(timestamp) {
   if (!timestamp) return "";
@@ -24,15 +23,12 @@ export default function Sidebar({
   onMuteToggle,
 }) {
   const { user, logout } = useAuth();
-  const { unreadCount } = useNotificationCount(!!user?.id);
   const [showProfile, setShowProfile] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const nav = useNavigate();
-  const location = useLocation();
 
   const avatarUrl = user?.avatar_url || user?.profile?.avatar_url || null;
   const displayName = user?.display_name || user?.profile?.display_name || user?.username;
-  const profileIdentifier = user?.username || user?.id;
 
   // helper to get display name for any user object `u`
   const getDisplayName = (u) => u?.display_name || u?.profile?.display_name || u?.username || "Unknown";
@@ -89,40 +85,6 @@ export default function Sidebar({
             <h2 style={{ margin: 0 }}>Chats</h2>
             <div style={{ fontSize: "0.85rem", opacity: 0.8 }}>{displayName}</div>
           </div>
-        </div>
-
-        <div className="sidebar-quick-nav">
-          <button
-            className={`btn btn-secondary small ${location.pathname.startsWith("/chat") ? "active" : ""}`}
-            onClick={() => nav("/chat")}
-          >
-            Chats
-          </button>
-          <button
-            className={`btn btn-secondary small ${location.pathname.startsWith("/feed") ? "active" : ""}`}
-            onClick={() => nav("/feed")}
-          >
-            Feed
-          </button>
-          <button
-            className={`btn btn-secondary small ${location.pathname.startsWith("/friends") ? "active" : ""}`}
-            onClick={() => nav("/friends")}
-          >
-            Friends
-          </button>
-          <button
-            className={`btn btn-secondary small ${location.pathname.startsWith("/notifications") ? "active" : ""}`}
-            onClick={() => nav("/notifications")}
-          >
-            Notifications{unreadCount > 0 ? ` (${unreadCount > 99 ? "99+" : unreadCount})` : ""}
-          </button>
-          <button
-            className={`btn btn-secondary small ${location.pathname.startsWith("/profile/") ? "active" : ""}`}
-            onClick={() => profileIdentifier && nav(`/profile/${profileIdentifier}`)}
-            disabled={!profileIdentifier}
-          >
-            Profile
-          </button>
         </div>
       </div>
 
