@@ -20,7 +20,8 @@ import api, {
  * If you want PDF thumbnails, install: `npm install pdfjs-dist`
  */
 
-export default function useChat(user) {
+export default function useChat(user, options = {}) {
+  const preferredConversationUserId = options?.openConversationUserId ?? null;
   const [theme, setTheme] = useState(localStorage.getItem("theme") || "dark");
   const [users, setUsers] = useState([]);
   const [selected, setSelected] = useState(null);
@@ -43,6 +44,7 @@ export default function useChat(user) {
   const typingTimeoutRef = useRef(null);
   const lastTypingSentRef = useRef(0);
   const deliveredAcksRef = useRef(new Set());
+  const pendingPreferredUserIdRef = useRef(preferredConversationUserId ? Number(preferredConversationUserId) : null);
 
   // Attachment states
   const [selectedFile, setSelectedFile] = useState(null);
@@ -146,6 +148,10 @@ export default function useChat(user) {
     selectedRef.current = selected;
   }, [selected]);
 
+  useEffect(() => {
+    pendingPreferredUserIdRef.current = preferredConversationUserId ? Number(preferredConversationUserId) : null;
+  }, [preferredConversationUserId]);
+
   const toggleTheme = useCallback(() => {
     setTheme((prev) => (prev === "dark" ? "light" : "dark"));
   }, []);
@@ -188,9 +194,16 @@ export default function useChat(user) {
       if (savedId) {
         initialSelected = sorted.find((u) => u.id?.toString() === savedId);
       }
+      const preferredUserId = pendingPreferredUserIdRef.current;
+      const preferredSelected = preferredUserId
+        ? sorted.find((u) => Number(u.id) === Number(preferredUserId))
+        : null;
       const currentSelected = selectedRef.current;
       const hasCurrentSelected = currentSelected ? sorted.some((u) => u.id === currentSelected.id) : false;
-      if (!hasCurrentSelected) {
+      if (preferredSelected) {
+        pendingPreferredUserIdRef.current = null;
+        setSelected(preferredSelected);
+      } else if (!hasCurrentSelected) {
         setSelected(initialSelected || (sorted.length ? sorted[0] : null));
       } else {
         setSelected((prev) => {

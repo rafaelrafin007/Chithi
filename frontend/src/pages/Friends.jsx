@@ -10,6 +10,7 @@ import {
   respondFriendRequest,
   cancelFriendRequest,
   unblockUser,
+  openConversation,
 } from "../services/api";
 
 export default function Friends() {
@@ -18,6 +19,7 @@ export default function Friends() {
   const [outgoing, setOutgoing] = useState([]);
   const [loading, setLoading] = useState(true);
   const [actionError, setActionError] = useState("");
+  const [openingInboxUserId, setOpeningInboxUserId] = useState(null);
   const nav = useNavigate();
 
   useEffect(() => {
@@ -95,6 +97,25 @@ export default function Friends() {
       );
     } catch (e) {
       setActionError(e?.response?.data?.detail || "Failed to unblock user.");
+    }
+  };
+
+  const canShowInboxButton = (u) => {
+    if (!u) return false;
+    if (u.is_blocked_by_me || u.has_blocked_me) return false;
+    return u.friend_status === "friends";
+  };
+
+  const handleOpenInbox = async (u) => {
+    try {
+      setActionError("");
+      setOpeningInboxUserId(u.id);
+      await openConversation(u.id);
+      nav("/chat", { state: { openConversationUserId: u.id } });
+    } catch (e) {
+      setActionError(e?.response?.data?.detail || "Unable to open inbox for this user.");
+    } finally {
+      setOpeningInboxUserId(null);
     }
   };
 
@@ -208,6 +229,15 @@ export default function Friends() {
                       </button>
                     )}
                     {u.friend_status === "friends" && <span className="friends-chip">Connected</span>}
+                    {canShowInboxButton(u) && (
+                      <button
+                        className="btn btn-secondary"
+                        onClick={() => handleOpenInbox(u)}
+                        disabled={openingInboxUserId === u.id}
+                      >
+                        {openingInboxUserId === u.id ? "Opening..." : "Inbox"}
+                      </button>
+                    )}
                   </>
                 )}
               </div>

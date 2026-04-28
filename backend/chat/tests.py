@@ -320,3 +320,45 @@ class ChatConversationStateTests(APITestCase):
         self.assertEqual(mute_response.status_code, status.HTTP_200_OK)
         archive_response = self.client.post(f"/api/chat/conversation/{self.alice.id}/archive/", {}, format="json")
         self.assertEqual(archive_response.status_code, status.HTTP_200_OK)
+
+    def test_open_endpoint_restores_deleted_chat_for_current_user(self):
+        Message.objects.create(sender=self.alice, receiver=self.bob, content="restore me")
+        self._auth(self.bob)
+        delete_response = self.client.post(f"/api/chat/conversation/{self.alice.id}/delete/", {}, format="json")
+        self.assertEqual(delete_response.status_code, status.HTTP_200_OK)
+        users_after_delete = self._users_payload()
+        self.assertFalse(any(u["id"] == self.alice.id for u in users_after_delete))
+
+        open_response = self.client.post(f"/api/chat/conversation/{self.alice.id}/open/", {}, format="json")
+        self.assertEqual(open_response.status_code, status.HTTP_200_OK)
+        users_after_open = self._users_payload()
+        self.assertTrue(any(u["id"] == self.alice.id for u in users_after_open))
+
+    def test_open_endpoint_does_not_change_other_participant_state(self):
+        self._auth(self.bob)
+        self.client.post(f"/api/chat/conversation/{self.alice.id}/delete/", {}, format="json")
+        self.client.post(f"/api/chat/conversation/{self.alice.id}/open/", {}, format="json")
+
+        self.assertFalse(
+            ConversationState.objects.filter(
+                user=self.alice,
+                other_user=self.bob,
+            ).exists()
+        )
+
+    def test_open_endpoint_on_visible_conversation_is_idempotent_and_no_duplicates(self):
+        self._auth(self.bob)
+        first_open = self.client.post(f"/api/chat/conversation/{self.alice.id}/open/", {}, format="json")
+        self.assertEqual(first_open.status_code, status.HTTP_200_OK)
+        second_open = self.client.post(f"/api/chat/conversation/{self.alice.id}/open/", {}, format="json")
+        self.assertEqual(second_open.status_code, status.HTTP_200_OK)
+        self.assertEqual(
+            ConversationState.objects.filter(user=self.bob, other_user=self.alice).count(),
+            1,
+        )
+
+    def test_blocked_users_cannot_open_conversation_via_open_endpoint(self):
+        Block.objects.create(blocker=self.alice, blocked=self.bob)
+        self._auth(self.bob)
+        response = self.client.post(f"/api/chat/conversation/{self.alice.id}/open/", {}, format="json")
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)

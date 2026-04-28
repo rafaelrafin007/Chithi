@@ -1,5 +1,6 @@
 // src/pages/chatpage.jsx
 import React, { useEffect, useRef, useState } from "react";
+import { useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import Sidebar from "./Sidebar";
 import MessageBubble from "./MessageBubble";
@@ -8,7 +9,9 @@ import SocialNav from "../components/SocialNav";
 
 export default function ChatPage() {
   const { user } = useAuth();
-  const chat = useChat(user);
+  const location = useLocation();
+  const openConversationUserId = location.state?.openConversationUserId;
+  const chat = useChat(user, { openConversationUserId });
   const [sidebarWidth, setSidebarWidth] = useState(280);
   const [isHeaderMenuOpen, setIsHeaderMenuOpen] = useState(false);
   const isResizingRef = useRef(false);

@@ -379,6 +379,45 @@ class ConversationDeleteView(APIView):
         return Response({"detail": "Conversation deleted for current user.", "is_deleted": True}, status=200)
 
 
+class ConversationOpenView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, user_id):
+        try:
+            other = User.objects.get(pk=user_id)
+        except User.DoesNotExist:
+            return Response({"detail": "User not found"}, status=404)
+        if not are_friends(request.user, other):
+            return Response({"detail": "Not friends"}, status=403)
+        if is_blocked_between(request.user, other):
+            return Response(
+                {"detail": "Messaging is unavailable because one user has blocked the other."},
+                status=403,
+            )
+        state = _get_or_create_state(request.user, other)
+        if state is None:
+            return Response({"detail": "Conversation state storage is temporarily unavailable."}, status=503)
+
+        updated_fields = []
+        if _clear_deleted_state(state):
+            updated_fields.extend(["is_archived", "archived_at", "is_muted", "muted_at"])
+        elif state.is_archived:
+            state.mark_archived(False)
+            updated_fields.extend(["is_archived", "archived_at"])
+        if updated_fields:
+            state.save(update_fields=updated_fields + ["updated_at"])
+
+        return Response(
+            {
+                "detail": "Conversation opened.",
+                "is_archived": bool(state.is_archived),
+                "is_muted": bool(state.is_muted),
+                "is_deleted": _is_deleted_state(state),
+            },
+            status=200,
+        )
+
+
 class SendMessageView(APIView):
     """
     POST { receiver: <id>, content: <text>, attachment: <file?> }
