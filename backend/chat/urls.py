@@ -7,6 +7,7 @@ from .views import (
     ConversationUnarchiveView,
     ConversationMuteView,
     ConversationUnmuteView,
+    ConversationDeleteView,
     SendMessageView,
     WSTokenView,
 )
@@ -19,6 +20,7 @@ urlpatterns = [
     path("conversation/<int:user_id>/unarchive/", ConversationUnarchiveView.as_view(), name="conversation-unarchive"),
     path("conversation/<int:user_id>/mute/", ConversationMuteView.as_view(), name="conversation-mute"),
     path("conversation/<int:user_id>/unmute/", ConversationUnmuteView.as_view(), name="conversation-unmute"),
+    path("conversation/<int:user_id>/delete/", ConversationDeleteView.as_view(), name="conversation-delete"),
     path("send/", SendMessageView.as_view(), name="send-message"),
     path("ws-token/", WSTokenView.as_view(), name="chat-ws-token"),
 ]

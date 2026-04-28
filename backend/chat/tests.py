@@ -263,3 +263,60 @@ class ChatConversationStateTests(APITestCase):
         self.assertIsNotNone(alice_entry)
         self.assertTrue(alice_entry["has_blocked_me"])
         self.assertFalse(alice_entry["can_message"])
+
+    def test_delete_chat_hides_conversation_only_for_current_user(self):
+        Message.objects.create(sender=self.alice, receiver=self.bob, content="delete me")
+
+        self._auth(self.bob)
+        delete_response = self.client.post(f"/api/chat/conversation/{self.alice.id}/delete/", {}, format="json")
+        self.assertEqual(delete_response.status_code, status.HTTP_200_OK)
+
+        bob_users = self._users_payload()
+        self.assertFalse(any(u["id"] == self.alice.id for u in bob_users))
+
+        self._auth(self.alice)
+        alice_users = self._users_payload()
+        bob_entry_for_alice = next((u for u in alice_users if u["id"] == self.bob.id), None)
+        self.assertIsNotNone(bob_entry_for_alice)
+
+    def test_delete_chat_does_not_delete_other_participant_history(self):
+        msg = Message.objects.create(sender=self.alice, receiver=self.bob, content="history keeps")
+
+        self._auth(self.bob)
+        delete_response = self.client.post(f"/api/chat/conversation/{self.alice.id}/delete/", {}, format="json")
+        self.assertEqual(delete_response.status_code, status.HTTP_200_OK)
+
+        self._auth(self.alice)
+        convo_for_alice = self.client.get(f"/api/chat/conversation/{self.bob.id}/")
+        self.assertEqual(convo_for_alice.status_code, status.HTTP_200_OK)
+        self.assertTrue(any(item["id"] == msg.id for item in convo_for_alice.data))
+
+    def test_deleted_conversation_reappears_after_new_incoming_message(self):
+        Message.objects.create(sender=self.alice, receiver=self.bob, content="before delete")
+
+        self._auth(self.bob)
+        delete_response = self.client.post(f"/api/chat/conversation/{self.alice.id}/delete/", {}, format="json")
+        self.assertEqual(delete_response.status_code, status.HTTP_200_OK)
+        inbox_after_delete = self._users_payload()
+        self.assertFalse(any(u["id"] == self.alice.id for u in inbox_after_delete))
+
+        self._auth(self.alice)
+        send_response = self.client.post(
+            "/api/chat/send/",
+            {"receiver": self.bob.id, "content": "new message after delete"},
+            format="json",
+        )
+        self.assertEqual(send_response.status_code, status.HTTP_201_CREATED)
+
+        self._auth(self.bob)
+        inbox_after_new_message = self._users_payload()
+        self.assertTrue(any(u["id"] == self.alice.id for u in inbox_after_new_message))
+
+    def test_archive_and_mute_endpoints_still_work_after_delete_logic(self):
+        self._auth(self.bob)
+        self.client.post(f"/api/chat/conversation/{self.alice.id}/delete/", {}, format="json")
+
+        mute_response = self.client.post(f"/api/chat/conversation/{self.alice.id}/mute/", {}, format="json")
+        self.assertEqual(mute_response.status_code, status.HTTP_200_OK)
+        archive_response = self.client.post(f"/api/chat/conversation/{self.alice.id}/archive/", {}, format="json")
+        self.assertEqual(archive_response.status_code, status.HTTP_200_OK)

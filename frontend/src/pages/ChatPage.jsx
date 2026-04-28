@@ -87,6 +87,7 @@ export default function ChatPage() {
         setShowArchived={chat.setShowArchived}
         onArchiveToggle={chat.setConversationArchived}
         onMuteToggle={chat.setConversationMuted}
+        onDeleteConversation={chat.deleteConversationForMe}
       />
 
       <div
@@ -182,6 +183,19 @@ export default function ChatPage() {
                       }}
                     >
                       {selected.is_archived ? "Unarchive" : "Archive"}
+                    </button>
+                    <button
+                      type="button"
+                      className="chat-header-menu-item danger"
+                      role="menuitem"
+                      onClick={async () => {
+                        const confirmed = window.confirm("Delete this chat for you? This will hide it from your chat list.");
+                        if (!confirmed) return;
+                        await chat.deleteConversationForMe(selected.id);
+                        setIsHeaderMenuOpen(false);
+                      }}
+                    >
+                      Delete chat
                     </button>
                   </div>
                 )}

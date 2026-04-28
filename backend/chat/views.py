@@ -2,11 +2,13 @@ from django.contrib.auth import get_user_model
 from django.db.models import Q
 from django.db.utils import OperationalError, ProgrammingError
 from django.db import connection
+from datetime import datetime
 from rest_framework import generics, status, permissions
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from django.core.signing import TimestampSigner
+from django.utils import timezone
 
 from .models import Message, ConversationState
 from .serializers import UserLiteSerializer, MessageSerializer
@@ -17,6 +19,7 @@ from asgiref.sync import async_to_sync
 from channels.layers import get_channel_layer
 
 User = get_user_model()
+DELETE_MARKER_AT = timezone.make_aware(datetime(2099, 1, 1, 0, 0, 0))
 
 
 def _is_missing_state_table_error(exc):
@@ -64,10 +67,34 @@ def _mark_conversation_read(user, other_user):
     return state
 
 
+def _is_deleted_state(state):
+    return bool(state and state.is_archived and state.archived_at == DELETE_MARKER_AT)
+
+
+def _mark_conversation_deleted_for_user(state):
+    state.is_archived = True
+    state.archived_at = DELETE_MARKER_AT
+    state.is_muted = False
+    state.muted_at = DELETE_MARKER_AT
+
+
+def _clear_deleted_state(state):
+    if not _is_deleted_state(state):
+        return False
+    state.is_archived = False
+    state.archived_at = None
+    state.is_muted = False
+    state.muted_at = None
+    return True
+
+
 def _touch_state_for_new_message(sender, receiver, message_timestamp):
     sender_state = _get_or_create_state(sender, receiver)
     if sender_state is None:
         return
+    if _clear_deleted_state(sender_state):
+        sender_state.save(update_fields=["is_archived", "archived_at", "is_muted", "muted_at", "updated_at"])
+        sender_state.refresh_from_db()
     changed_sender_fields = []
     if not sender_state.last_read_at or message_timestamp > sender_state.last_read_at:
         sender_state.last_read_at = message_timestamp
@@ -79,6 +106,9 @@ def _touch_state_for_new_message(sender, receiver, message_timestamp):
         sender_state.save(update_fields=changed_sender_fields + ["updated_at"])
 
     receiver_state = _get_or_create_state(receiver, sender)
+    if receiver_state and _clear_deleted_state(receiver_state):
+        receiver_state.save(update_fields=["is_archived", "archived_at", "is_muted", "muted_at", "updated_at"])
+        receiver_state.refresh_from_db()
     if receiver_state.is_archived:
         receiver_state.mark_archived(False)
         receiver_state.save(update_fields=["is_archived", "archived_at", "updated_at"])
@@ -183,9 +213,9 @@ class UsersListView(generics.ListAPIView):
         archived_param = str(request.query_params.get("archived", "")).lower()
         archived_requested = archived_param in {"1", "true", "yes"}
         if archived_requested:
-            payload = [item for item in payload if item.get("is_archived")]
+            payload = [item for item in payload if item.get("is_archived") and not item.get("is_deleted")]
         else:
-            payload = [item for item in payload if not item.get("is_archived")]
+            payload = [item for item in payload if not item.get("is_archived") and not item.get("is_deleted")]
 
         payload.sort(
             key=lambda item: item.get("last_message_at") or "",
@@ -329,6 +359,24 @@ class ConversationUnmuteView(APIView):
         state.mark_muted(False)
         state.save(update_fields=["is_muted", "muted_at", "updated_at"])
         return Response({"detail": "Conversation unmuted.", "is_muted": False}, status=200)
+
+
+class ConversationDeleteView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, user_id):
+        try:
+            other = User.objects.get(pk=user_id)
+        except User.DoesNotExist:
+            return Response({"detail": "User not found"}, status=404)
+        if not are_friends(request.user, other):
+            return Response({"detail": "Not friends"}, status=403)
+        state = _get_or_create_state(request.user, other)
+        if state is None:
+            return Response({"detail": "Conversation state storage is temporarily unavailable."}, status=503)
+        _mark_conversation_deleted_for_user(state)
+        state.save(update_fields=["is_archived", "archived_at", "is_muted", "muted_at", "updated_at"])
+        return Response({"detail": "Conversation deleted for current user.", "is_deleted": True}, status=200)
 
 
 class SendMessageView(APIView):

@@ -481,6 +481,10 @@ body.light-theme .chat-user.active {
   background: rgba(255, 255, 255, 0.1);
 }
 
+.chat-row-menu-item.danger {
+  color: #ff9ea4;
+}
+
 body.light-theme .chat-row-overflow-btn {
   background: rgba(17, 24, 39, 0.06);
   border-color: rgba(17, 24, 39, 0.14);
@@ -616,6 +620,10 @@ body.dark-theme .chat-header {
 
 .chat-header-menu-item:hover {
   background: rgba(255, 255, 255, 0.1);
+}
+
+.chat-header-menu-item.danger {
+  color: #ff9ea4;
 }
 
 body.light-theme .chat-header-overflow-btn {

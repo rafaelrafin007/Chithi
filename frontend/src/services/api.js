@@ -26,6 +26,7 @@ export const archiveConversation = (userId) => api.post(`/api/chat/conversation/
 export const unarchiveConversation = (userId) => api.post(`/api/chat/conversation/${userId}/unarchive/`);
 export const muteConversation = (userId) => api.post(`/api/chat/conversation/${userId}/mute/`);
 export const unmuteConversation = (userId) => api.post(`/api/chat/conversation/${userId}/unmute/`);
+export const deleteConversation = (userId) => api.post(`/api/chat/conversation/${userId}/delete/`);
 
 /**
  * sendMessage(receiverId, content, file)

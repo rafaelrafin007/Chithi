@@ -9,6 +9,7 @@ import api, {
   unarchiveConversation,
   muteConversation,
   unmuteConversation,
+  deleteConversation,
 } from "../services/api";
 
 /**
@@ -906,6 +907,29 @@ export default function useChat(user) {
     }
   };
 
+  const deleteConversationForMe = async (userId) => {
+    if (!userId) return { ok: false };
+    setConversationError("");
+    try {
+      await deleteConversation(userId);
+      setUsers((prev) => prev.filter((u) => u.id !== userId));
+      setSelected((prev) => {
+        if (!prev || prev.id !== userId) return prev;
+        return null;
+      });
+      setMessages((prev) => {
+        if (selectedRef.current?.id !== userId) return prev;
+        return [];
+      });
+      setConversationError("");
+      return { ok: true };
+    } catch (err) {
+      console.error("Failed to delete conversation", err);
+      setConversationError(err?.response?.data?.detail || "Unable to delete this chat.");
+      return { ok: false };
+    }
+  };
+
   return {
     // state
     theme,
@@ -949,5 +973,6 @@ export default function useChat(user) {
     fetchConversation,
     setConversationArchived,
     setConversationMuted,
+    deleteConversationForMe,
   };
 }

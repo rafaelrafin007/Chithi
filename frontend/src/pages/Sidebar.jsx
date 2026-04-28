@@ -21,6 +21,7 @@ export default function Sidebar({
   setShowArchived,
   onArchiveToggle,
   onMuteToggle,
+  onDeleteConversation,
 }) {
   const { user, logout } = useAuth();
   const [showProfile, setShowProfile] = useState(false);
@@ -226,6 +227,19 @@ export default function Sidebar({
                       }}
                     >
                       {u.is_archived ? "Unarchive" : "Archive"}
+                    </button>
+                    <button
+                      type="button"
+                      className="chat-row-menu-item danger"
+                      role="menuitem"
+                      onClick={async () => {
+                        const confirmed = window.confirm("Delete this chat for you? This will hide it from your chat list.");
+                        if (!confirmed) return;
+                        await onDeleteConversation?.(u.id);
+                        setOpenRowMenuId(null);
+                      }}
+                    >
+                      Delete chat
                     </button>
                   </div>
                 )}

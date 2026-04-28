@@ -167,6 +167,7 @@ class UserLiteSerializer(serializers.ModelSerializer):
     unread = serializers.SerializerMethodField()
     is_archived = serializers.SerializerMethodField()
     is_muted = serializers.SerializerMethodField()
+    is_deleted = serializers.SerializerMethodField()
     is_blocked_by_me = serializers.SerializerMethodField()
     has_blocked_me = serializers.SerializerMethodField()
     can_message = serializers.SerializerMethodField()
@@ -183,6 +184,7 @@ class UserLiteSerializer(serializers.ModelSerializer):
             "unread",
             "is_archived",
             "is_muted",
+            "is_deleted",
             "is_blocked_by_me",
             "has_blocked_me",
             "can_message",
@@ -267,6 +269,17 @@ class UserLiteSerializer(serializers.ModelSerializer):
     def get_is_muted(self, obj):
         state = self._state_for(obj)
         return bool(getattr(state, "is_muted", False))
+
+    def get_is_deleted(self, obj):
+        state = self._state_for(obj)
+        return bool(
+            state
+            and getattr(state, "is_archived", False)
+            and getattr(state, "archived_at", None)
+            and getattr(state, "muted_at", None)
+            and state.archived_at == state.muted_at
+            and state.archived_at.year >= 2099
+        )
 
     def get_is_blocked_by_me(self, obj):
         ids = self.context.get("blocked_by_me_ids") or set()
