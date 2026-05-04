@@ -129,103 +129,108 @@ export default function SearchPage() {
 
   return (
     <div className="social-page">
-      <div className="social-shell">
-        <div className="social-top">
-          <div>
-            <div className="social-kicker">Chithi Social</div>
-            <h2>Search</h2>
+      <div className="social-shell with-side-nav">
+        <aside className="social-side-panel">
+          <SocialNav variant="sidebar" />
+        </aside>
+
+        <div className="social-main">
+          <div className="social-top">
+            <div>
+              <div className="social-kicker">Chithi Social</div>
+              <h2>Search</h2>
+            </div>
           </div>
-          <SocialNav />
+
+          <section className="social-card">
+            <form className="search-form" onSubmit={handleSearchSubmit}>
+              <input
+                type="text"
+                className="comment-input search-input"
+                placeholder="Search users or public posts..."
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+              />
+              <button type="submit" className="social-action-btn">
+                Search
+              </button>
+            </form>
+          </section>
+
+          <section className="social-card">
+            <h3 className="social-card-title">
+              {activeQuery ? `People matching "${activeQuery}"` : "People"}
+            </h3>
+            {loading ? (
+              <div className="social-state">Searching users...</div>
+            ) : usersError ? (
+              <div className="social-inline-error">{usersError}</div>
+            ) : users.length === 0 ? (
+              <div className="social-state">No users found.</div>
+            ) : (
+              <div className="search-user-list">
+                {users.map((item) => {
+                  const identifier = item.username || item.id;
+                  return (
+                    <div key={item.id} className="search-user-row">
+                      <button
+                        type="button"
+                        className="notification-actor-link"
+                        onClick={() => nav(`/profile/${identifier}`)}
+                      >
+                        {item.avatar_url ? (
+                          <img src={item.avatar_url} alt={displayName(item)} className="post-avatar" />
+                        ) : (
+                          <div className="post-avatar fallback">{displayName(item).charAt(0).toUpperCase()}</div>
+                        )}
+                        <div>
+                          <div>{displayName(item)}</div>
+                          <div className="post-time">@{item.username}</div>
+                        </div>
+                      </button>
+                      {item.is_following && <span className="friends-chip">Following</span>}
+                    </div>
+                  );
+                })}
+                {usersNextPage && (
+                  <button type="button" className="social-load-btn" onClick={loadMoreUsers} disabled={loadingUsersMore}>
+                    {loadingUsersMore ? "Loading..." : "Load more users"}
+                  </button>
+                )}
+              </div>
+            )}
+          </section>
+
+          <section className="social-card">
+            <h3 className="social-card-title">
+              {activeQuery ? `Public posts matching "${activeQuery}"` : "Recent public posts"}
+            </h3>
+            {loading ? (
+              <div className="social-state">Loading posts...</div>
+            ) : postsError ? (
+              <div className="social-inline-error">{postsError}</div>
+            ) : posts.length === 0 ? (
+              <div className="social-state">No public posts found.</div>
+            ) : (
+              <div className="social-list">
+                {posts.map((post) => (
+                  <PostCard
+                    key={post.id}
+                    post={post}
+                    currentUserId={user?.id}
+                    onPostUpdated={handlePostUpdated}
+                    onPostRemoved={handlePostRemoved}
+                  />
+                ))}
+                {postsNextPage && (
+                  <button type="button" className="social-load-btn" onClick={loadMorePosts} disabled={loadingPostsMore}>
+                    {loadingPostsMore ? "Loading..." : "Load more posts"}
+                  </button>
+                )}
+              </div>
+            )}
+          </section>
         </div>
-
-        <section className="social-card">
-          <form className="search-form" onSubmit={handleSearchSubmit}>
-            <input
-              type="text"
-              className="comment-input search-input"
-              placeholder="Search users or public posts..."
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-            />
-            <button type="submit" className="social-action-btn">
-              Search
-            </button>
-          </form>
-        </section>
-
-        <section className="social-card">
-          <h3 className="social-card-title">
-            {activeQuery ? `People matching "${activeQuery}"` : "People"}
-          </h3>
-          {loading ? (
-            <div className="social-state">Searching users...</div>
-          ) : usersError ? (
-            <div className="social-inline-error">{usersError}</div>
-          ) : users.length === 0 ? (
-            <div className="social-state">No users found.</div>
-          ) : (
-            <div className="search-user-list">
-              {users.map((item) => {
-                const identifier = item.username || item.id;
-                return (
-                  <div key={item.id} className="search-user-row">
-                    <button
-                      type="button"
-                      className="notification-actor-link"
-                      onClick={() => nav(`/profile/${identifier}`)}
-                    >
-                      {item.avatar_url ? (
-                        <img src={item.avatar_url} alt={displayName(item)} className="post-avatar" />
-                      ) : (
-                        <div className="post-avatar fallback">{displayName(item).charAt(0).toUpperCase()}</div>
-                      )}
-                      <div>
-                        <div>{displayName(item)}</div>
-                        <div className="post-time">@{item.username}</div>
-                      </div>
-                    </button>
-                    {item.is_following && <span className="friends-chip">Following</span>}
-                  </div>
-                );
-              })}
-              {usersNextPage && (
-                <button type="button" className="social-load-btn" onClick={loadMoreUsers} disabled={loadingUsersMore}>
-                  {loadingUsersMore ? "Loading..." : "Load more users"}
-                </button>
-              )}
-            </div>
-          )}
-        </section>
-
-        <section className="social-card">
-          <h3 className="social-card-title">
-            {activeQuery ? `Public posts matching "${activeQuery}"` : "Recent public posts"}
-          </h3>
-          {loading ? (
-            <div className="social-state">Loading posts...</div>
-          ) : postsError ? (
-            <div className="social-inline-error">{postsError}</div>
-          ) : posts.length === 0 ? (
-            <div className="social-state">No public posts found.</div>
-          ) : (
-            <div className="social-list">
-              {posts.map((post) => (
-                <PostCard
-                  key={post.id}
-                  post={post}
-                  currentUserId={user?.id}
-                  onPostUpdated={handlePostUpdated}
-                  onPostRemoved={handlePostRemoved}
-                />
-              ))}
-              {postsNextPage && (
-                <button type="button" className="social-load-btn" onClick={loadMorePosts} disabled={loadingPostsMore}>
-                  {loadingPostsMore ? "Loading..." : "Load more posts"}
-                </button>
-              )}
-            </div>
-          )}
-        </section>
       </div>
     </div>
   );

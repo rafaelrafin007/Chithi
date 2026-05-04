@@ -48,6 +48,7 @@ export default function SocialNav({ className = "", variant = "default" }) {
 
   const profileIdentifier = user?.username || user?.id;
   const iconOnly = variant === "icon-only";
+  const sidebar = variant === "sidebar";
 
   const links = iconOnly
     ? [
@@ -60,13 +61,14 @@ export default function SocialNav({ className = "", variant = "default" }) {
     : [
         { key: "feed", label: "Feed", to: "/feed", icon: ICONS.feed },
         { key: "search", label: "Search", to: "/search", icon: ICONS.search },
+        { key: "friends", label: "Friends", to: "/friends", icon: ICONS.friends },
         { key: "notifications", label: "Notifications", to: "/notifications", icon: ICONS.notifications },
         { key: "chat", label: "Chats", to: "/chat", icon: ICONS.chat },
         { key: "profile", label: "Profile", to: profileIdentifier ? `/profile/${profileIdentifier}` : "/feed", icon: ICONS.profile },
       ];
 
   return (
-    <div className={`social-nav ${iconOnly ? "icon-only" : ""} ${className}`.trim()}>
+    <div className={`social-nav ${iconOnly ? "icon-only" : ""} ${sidebar ? "sidebar" : ""} ${className}`.trim()}>
       {links.map((item) => {
         const isActive =
           item.key === "feed"
@@ -89,7 +91,8 @@ export default function SocialNav({ className = "", variant = "default" }) {
             aria-label={item.label}
             title={item.label}
           >
-            {iconOnly ? <span className="social-nav-icon">{item.icon}</span> : <span>{item.label}</span>}
+            {(iconOnly || sidebar) && <span className="social-nav-icon">{item.icon}</span>}
+            {!iconOnly && <span>{item.label}</span>}
             {item.key === "notifications" && unreadCount > 0 && (
               <span className="social-nav-badge">{unreadCount > 99 ? "99+" : unreadCount}</span>
             )}

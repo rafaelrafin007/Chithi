@@ -140,46 +140,50 @@ export default function FeedPage() {
 
   return (
     <div className="social-page">
-      <div className="social-shell">
-        <div className="social-top">
-          <div>
-            <div className="social-kicker">Chithi Social</div>
-            <h2>Feed</h2>
+      <div className="social-shell with-side-nav">
+        <aside className="social-side-panel">
+          <SocialNav variant="sidebar" />
+        </aside>
+        <div className="social-main">
+          <div className="social-top">
+            <div>
+              <div className="social-kicker">Chithi Social</div>
+              <h2>Feed</h2>
+            </div>
           </div>
-          <SocialNav />
-        </div>
 
-        <CreatePostComposer onCreated={handlePostCreated} />
+          <CreatePostComposer onCreated={handlePostCreated} />
 
-        {loading ? (
-          <div className="social-state">Loading feed...</div>
-        ) : error ? (
-          <div className="social-state error">
-            <p>{error}</p>
-            <button type="button" className="social-action-btn" onClick={() => loadFeed({ page: 1, append: false })}>
-              Retry
-            </button>
-          </div>
-        ) : posts.length === 0 ? (
-          <div className="social-state">No posts yet. Start the conversation.</div>
-        ) : (
-          <div className="social-list">
-            {posts.map((post) => (
-              <PostCard
-                key={post.id}
-                post={post}
-                currentUserId={user?.id}
-                onPostUpdated={handlePostUpdated}
-                onPostRemoved={handlePostRemoved}
-              />
-            ))}
-            {nextPage && (
-              <button type="button" className="social-load-btn" onClick={loadMore} disabled={loadingMore}>
-                {loadingMore ? "Loading..." : "Load more"}
+          {loading ? (
+            <div className="social-state">Loading feed...</div>
+          ) : error ? (
+            <div className="social-state error">
+              <p>{error}</p>
+              <button type="button" className="social-action-btn" onClick={() => loadFeed({ page: 1, append: false })}>
+                Retry
               </button>
-            )}
-          </div>
-        )}
+            </div>
+          ) : posts.length === 0 ? (
+            <div className="social-state">No posts yet. Start the conversation.</div>
+          ) : (
+            <div className="social-list">
+              {posts.map((post) => (
+                <PostCard
+                  key={post.id}
+                  post={post}
+                  currentUserId={user?.id}
+                  onPostUpdated={handlePostUpdated}
+                  onPostRemoved={handlePostRemoved}
+                />
+              ))}
+              {nextPage && (
+                <button type="button" className="social-load-btn" onClick={loadMore} disabled={loadingMore}>
+                  {loadingMore ? "Loading..." : "Load more"}
+                </button>
+              )}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

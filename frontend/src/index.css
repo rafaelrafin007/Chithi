@@ -1422,6 +1422,28 @@ body.dark-theme .edit-icon{color:#fff;}
   margin: 0 auto;
 }
 
+.social-shell.with-side-nav {
+  max-width: 1180px;
+  display: grid;
+  grid-template-columns: 220px minmax(0, 1fr);
+  gap: 18px;
+  align-items: start;
+}
+
+.social-side-panel {
+  position: sticky;
+  top: 20px;
+  background: rgba(18, 23, 32, 0.92);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+  padding: 12px;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.32);
+}
+
+.social-main {
+  min-width: 0;
+}
+
 .social-top {
   display: flex;
   align-items: flex-end;
@@ -1464,6 +1486,27 @@ body.dark-theme .edit-icon{color:#fff;}
 .social-nav-btn.active {
   background: linear-gradient(135deg, rgba(123, 97, 255, 0.45), rgba(78, 161, 255, 0.42));
   border-color: rgba(135, 170, 255, 0.65);
+}
+
+.social-nav.sidebar {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  gap: 8px;
+}
+
+.social-nav.sidebar .social-nav-btn {
+  width: 100%;
+  justify-content: flex-start;
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 0.92rem;
+  gap: 10px;
+}
+
+.social-nav.sidebar .social-nav-badge {
+  margin-left: auto;
+  position: static;
 }
 
 .social-nav-icon {
@@ -1997,6 +2040,12 @@ body.light-theme .social-card {
   box-shadow: 0 14px 30px rgba(17, 24, 39, 0.08);
 }
 
+body.light-theme .social-side-panel {
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid rgba(17, 24, 39, 0.1);
+  box-shadow: 0 14px 30px rgba(17, 24, 39, 0.08);
+}
+
 body.light-theme .social-nav-btn {
   color: #1f2937;
   border-color: rgba(17, 24, 39, 0.2);
@@ -2054,6 +2103,29 @@ body.light-theme .search-user-row {
 }
 
 @media (max-width: 760px) {
+  .social-shell.with-side-nav {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+  .social-side-panel {
+    position: static;
+  }
+  .social-nav.sidebar {
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+  .social-nav.sidebar .social-nav-btn {
+    width: auto;
+    flex: 1 1 calc(33.333% - 8px);
+    justify-content: center;
+    min-width: 120px;
+  }
+  .social-nav.sidebar .social-nav-badge {
+    position: absolute;
+    top: -5px;
+    right: -5px;
+    margin-left: 0;
+  }
   .social-top {
     flex-direction: column;
     align-items: flex-start;

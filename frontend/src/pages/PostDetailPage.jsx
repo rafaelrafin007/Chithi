@@ -116,48 +116,52 @@ export default function PostDetailPage() {
 
   return (
     <div className="social-page">
-      <div className="social-shell">
-        <div className="social-top">
-          <div>
-            <div className="social-kicker">Chithi Social</div>
-            <h2>Post</h2>
+      <div className="social-shell with-side-nav">
+        <aside className="social-side-panel">
+          <SocialNav variant="sidebar" />
+        </aside>
+        <div className="social-main">
+          <div className="social-top">
+            <div>
+              <div className="social-kicker">Chithi Social</div>
+              <h2>Post</h2>
+            </div>
           </div>
-          <SocialNav />
-        </div>
 
-        {loading ? (
-          <div className="social-state">Loading post...</div>
-        ) : deleted ? (
-          <div className="social-state">
-            <p>This post was deleted.</p>
-            <button type="button" className="social-action-btn" onClick={() => nav("/feed")}>
-              Back to feed
-            </button>
-          </div>
-        ) : post ? (
-          <PostCard
-            post={post}
-            currentUserId={user?.id}
-            onPostUpdated={handlePostUpdated}
-            onPostRemoved={handlePostRemoved}
-            initialCommentsOpen
-            showOpenPostButton={false}
-          />
-        ) : (
-          <div className="social-state error">
-            <p>{error || "Post not available."}</p>
-            <div className="post-detail-actions">
-              {statusCode !== 404 && (
-                <button type="button" className="social-action-btn" onClick={loadPost}>
-                  Retry
-                </button>
-              )}
-              <button type="button" className="social-action-btn secondary" onClick={() => nav("/feed")}>
+          {loading ? (
+            <div className="social-state">Loading post...</div>
+          ) : deleted ? (
+            <div className="social-state">
+              <p>This post was deleted.</p>
+              <button type="button" className="social-action-btn" onClick={() => nav("/feed")}>
                 Back to feed
               </button>
             </div>
-          </div>
-        )}
+          ) : post ? (
+            <PostCard
+              post={post}
+              currentUserId={user?.id}
+              onPostUpdated={handlePostUpdated}
+              onPostRemoved={handlePostRemoved}
+              initialCommentsOpen
+              showOpenPostButton={false}
+            />
+          ) : (
+            <div className="social-state error">
+              <p>{error || "Post not available."}</p>
+              <div className="post-detail-actions">
+                {statusCode !== 404 && (
+                  <button type="button" className="social-action-btn" onClick={loadPost}>
+                    Retry
+                  </button>
+                )}
+                <button type="button" className="social-action-btn secondary" onClick={() => nav("/feed")}>
+                  Back to feed
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

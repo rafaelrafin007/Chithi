@@ -242,26 +242,29 @@ export default function ProfilePage() {
 
   return (
     <div className="social-page">
-      <div className="social-shell">
-        <div className="social-top">
-          <div>
-            <div className="social-kicker">Chithi Social</div>
-            <h2>Profile</h2>
+      <div className="social-shell with-side-nav">
+        <aside className="social-side-panel">
+          <SocialNav variant="sidebar" />
+        </aside>
+        <div className="social-main">
+          <div className="social-top">
+            <div>
+              <div className="social-kicker">Chithi Social</div>
+              <h2>Profile</h2>
+            </div>
           </div>
-          <SocialNav />
-        </div>
 
-        {loadingProfile ? (
-          <div className="social-state">Loading profile...</div>
-        ) : error && !profile ? (
-          <div className="social-state error">
-            <p>{error}</p>
-            <button type="button" className="social-action-btn" onClick={fetchProfile}>
-              Retry
-            </button>
-          </div>
-        ) : profile ? (
-          <section className="social-card profile-hero">
+          {loadingProfile ? (
+            <div className="social-state">Loading profile...</div>
+          ) : error && !profile ? (
+            <div className="social-state error">
+              <p>{error}</p>
+              <button type="button" className="social-action-btn" onClick={fetchProfile}>
+                Retry
+              </button>
+            </div>
+          ) : profile ? (
+            <section className="social-card profile-hero">
             <div className="profile-hero-main">
               {profile.avatar_url ? (
                 <img src={profile.avatar_url} alt={profile.display_name} className="profile-hero-avatar" />
@@ -307,33 +310,34 @@ export default function ProfilePage() {
                 </div>
               )}
             </div>
-          </section>
-        ) : null}
+            </section>
+          ) : null}
 
-        {loadingPosts ? (
-          <div className="social-state">Loading posts...</div>
-        ) : error && posts.length === 0 ? (
-          <div className="social-state">{error}</div>
-        ) : posts.length === 0 ? (
-          <div className="social-state">No posts to show.</div>
-        ) : (
-          <div className="social-list">
-            {posts.map((post) => (
-              <PostCard
-                key={post.id}
-                post={post}
-                currentUserId={user?.id}
-                onPostUpdated={handlePostUpdated}
-                onPostRemoved={handlePostRemoved}
-              />
-            ))}
-            {nextPage && (
-              <button type="button" className="social-load-btn" onClick={loadMorePosts} disabled={loadingMore}>
-                {loadingMore ? "Loading..." : "Load more"}
-              </button>
-            )}
-          </div>
-        )}
+          {loadingPosts ? (
+            <div className="social-state">Loading posts...</div>
+          ) : error && posts.length === 0 ? (
+            <div className="social-state">{error}</div>
+          ) : posts.length === 0 ? (
+            <div className="social-state">No posts to show.</div>
+          ) : (
+            <div className="social-list">
+              {posts.map((post) => (
+                <PostCard
+                  key={post.id}
+                  post={post}
+                  currentUserId={user?.id}
+                  onPostUpdated={handlePostUpdated}
+                  onPostRemoved={handlePostRemoved}
+                />
+              ))}
+              {nextPage && (
+                <button type="button" className="social-load-btn" onClick={loadMorePosts} disabled={loadingMore}>
+                  {loadingMore ? "Loading..." : "Load more"}
+                </button>
+              )}
+            </div>
+          )}
+        </div>
       </div>
 
       {showEditor && (

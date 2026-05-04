@@ -153,97 +153,101 @@ export default function NotificationPage() {
 
   return (
     <div className="social-page">
-      <div className="social-shell">
-        <div className="social-top">
-          <div>
-            <div className="social-kicker">Chithi Social</div>
-            <h2>Notifications</h2>
+      <div className="social-shell with-side-nav">
+        <aside className="social-side-panel">
+          <SocialNav variant="sidebar" />
+        </aside>
+        <div className="social-main">
+          <div className="social-top">
+            <div>
+              <div className="social-kicker">Chithi Social</div>
+              <h2>Notifications</h2>
+            </div>
           </div>
-          <SocialNav />
-        </div>
 
-        <section className="social-card">
-          <div className="notification-toolbar">
-            <div className="notification-unread">{unreadCount} unread</div>
-            <button
-              type="button"
-              className="social-action-btn"
-              onClick={handleMarkAll}
-              disabled={!unreadCount || markingAll}
-            >
-              {markingAll ? "Updating..." : "Mark all as read"}
-            </button>
-          </div>
-        </section>
+          <section className="social-card">
+            <div className="notification-toolbar">
+              <div className="notification-unread">{unreadCount} unread</div>
+              <button
+                type="button"
+                className="social-action-btn"
+                onClick={handleMarkAll}
+                disabled={!unreadCount || markingAll}
+              >
+                {markingAll ? "Updating..." : "Mark all as read"}
+              </button>
+            </div>
+          </section>
 
-        {loading ? (
-          <div className="social-state">Loading notifications...</div>
-        ) : error ? (
-          <div className="social-state error">
-            <p>{error}</p>
-            <button type="button" className="social-action-btn" onClick={() => loadNotifications({ page: 1 })}>
-              Retry
-            </button>
-          </div>
-        ) : items.length === 0 ? (
-          <div className="social-state">No notifications yet.</div>
-        ) : (
-          <div className="social-list">
-            {items.map((item) => {
-              const destination = notificationDestination(item);
-              return (
-                <article key={item.id} className={`social-card notification-card ${item.is_read ? "read" : "unread"}`}>
-                <div className="notification-main">
-                  <button
-                    type="button"
-                    className="notification-actor-link"
-                    onClick={() => destination && nav(destination)}
-                    disabled={!destination}
-                  >
-                    {item.actor?.avatar_url ? (
-                      <img src={item.actor.avatar_url} alt={item.actor.display_name || item.actor.username} className="post-avatar" />
-                    ) : (
-                      <div className="post-avatar fallback">
-                        {(item.actor?.display_name || item.actor?.username || "U").charAt(0).toUpperCase()}
-                      </div>
-                    )}
-                    <div>
-                      <div>{buildMessage(item)}</div>
-                      <div className="post-time">{formatTime(item.created_at)}</div>
-                    </div>
-                  </button>
-                </div>
-                <div className="notification-actions">
-                  {!item.is_read && (
-                    <button type="button" className="social-link-btn" onClick={() => handleMarkOne(item.id)}>
-                      Mark read
-                    </button>
-                  )}
-                  {item.target_post_id && (
-                    <button type="button" className="social-link-btn" onClick={() => nav(`/post/${item.target_post_id}`)}>
-                      Open post
-                    </button>
-                  )}
-                  {!item.target_post_id && item.type === "follow" && item.actor && (
+          {loading ? (
+            <div className="social-state">Loading notifications...</div>
+          ) : error ? (
+            <div className="social-state error">
+              <p>{error}</p>
+              <button type="button" className="social-action-btn" onClick={() => loadNotifications({ page: 1 })}>
+                Retry
+              </button>
+            </div>
+          ) : items.length === 0 ? (
+            <div className="social-state">No notifications yet.</div>
+          ) : (
+            <div className="social-list">
+              {items.map((item) => {
+                const destination = notificationDestination(item);
+                return (
+                  <article key={item.id} className={`social-card notification-card ${item.is_read ? "read" : "unread"}`}>
+                  <div className="notification-main">
                     <button
                       type="button"
-                      className="social-link-btn"
-                      onClick={() => nav(`/profile/${item.actor.username || item.actor.id}`)}
+                      className="notification-actor-link"
+                      onClick={() => destination && nav(destination)}
+                      disabled={!destination}
                     >
-                      Open profile
+                      {item.actor?.avatar_url ? (
+                        <img src={item.actor.avatar_url} alt={item.actor.display_name || item.actor.username} className="post-avatar" />
+                      ) : (
+                        <div className="post-avatar fallback">
+                          {(item.actor?.display_name || item.actor?.username || "U").charAt(0).toUpperCase()}
+                        </div>
+                      )}
+                      <div>
+                        <div>{buildMessage(item)}</div>
+                        <div className="post-time">{formatTime(item.created_at)}</div>
+                      </div>
                     </button>
-                  )}
-                </div>
-                </article>
-              );
-            })}
-            {nextPage && (
-              <button type="button" className="social-load-btn" onClick={loadMore} disabled={loadingMore}>
-                {loadingMore ? "Loading..." : "Load more"}
-              </button>
-            )}
-          </div>
-        )}
+                  </div>
+                  <div className="notification-actions">
+                    {!item.is_read && (
+                      <button type="button" className="social-link-btn" onClick={() => handleMarkOne(item.id)}>
+                        Mark read
+                      </button>
+                    )}
+                    {item.target_post_id && (
+                      <button type="button" className="social-link-btn" onClick={() => nav(`/post/${item.target_post_id}`)}>
+                        Open post
+                      </button>
+                    )}
+                    {!item.target_post_id && item.type === "follow" && item.actor && (
+                      <button
+                        type="button"
+                        className="social-link-btn"
+                        onClick={() => nav(`/profile/${item.actor.username || item.actor.id}`)}
+                      >
+                        Open profile
+                      </button>
+                    )}
+                  </div>
+                  </article>
+                );
+              })}
+              {nextPage && (
+                <button type="button" className="social-load-btn" onClick={loadMore} disabled={loadingMore}>
+                  {loadingMore ? "Loading..." : "Load more"}
+                </button>
+              )}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
