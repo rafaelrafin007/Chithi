@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import SocialNav from "../components/SocialNav";
 import PostCard from "../components/PostCard";
 import { searchPosts, searchUsers } from "../services/api";
@@ -19,6 +19,8 @@ function displayName(user) {
 
 export default function SearchPage() {
   const nav = useNavigate();
+  const location = useLocation();
+  const [, setSearchParams] = useSearchParams();
   const { user } = useAuth();
 
   const [query, setQuery] = useState("");
@@ -87,14 +89,21 @@ export default function SearchPage() {
   );
 
   useEffect(() => {
-    runSearch("");
-  }, [runSearch]);
+    const params = new URLSearchParams(location.search);
+    const qFromUrl = (params.get("q") || "").trim();
+    setQuery(qFromUrl);
+    setActiveQuery(qFromUrl);
+    runSearch(qFromUrl);
+  }, [location.search, runSearch]);
 
-  const handleSearchSubmit = async (event) => {
+  const handleSearchSubmit = (event) => {
     event.preventDefault();
     const nextQuery = query.trim();
-    setActiveQuery(nextQuery);
-    await runSearch(nextQuery);
+    if (!nextQuery) {
+      setSearchParams({});
+      return;
+    }
+    setSearchParams({ q: nextQuery });
   };
 
   const loadMoreUsers = async () => {

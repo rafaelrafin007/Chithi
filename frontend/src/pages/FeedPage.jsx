@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { getFeed } from "../services/api";
 import { useAuth } from "../context/AuthContext";
 import SocialNav from "../components/SocialNav";
@@ -17,12 +18,14 @@ function normalizePaged(payload) {
 }
 
 export default function FeedPage() {
+  const nav = useNavigate();
   const { user } = useAuth();
   const [posts, setPosts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState("");
   const [nextPage, setNextPage] = useState(null);
+  const [searchQuery, setSearchQuery] = useState("");
 
   useEffect(() => {
     const theme = localStorage.getItem("theme") || "dark";
@@ -138,6 +141,16 @@ export default function FeedPage() {
     }
   };
 
+  const handleSearchSubmit = (event) => {
+    event.preventDefault();
+    const query = searchQuery.trim();
+    if (!query) {
+      nav("/search");
+      return;
+    }
+    nav(`/search?q=${encodeURIComponent(query)}`);
+  };
+
   return (
     <div className="social-page">
       <div className="social-shell with-side-nav">
@@ -150,6 +163,25 @@ export default function FeedPage() {
               <div className="social-kicker">Chithi Social</div>
               <h2>Feed</h2>
             </div>
+
+            <form className="feed-search-form feed-header-search" onSubmit={handleSearchSubmit}>
+              <span className="feed-search-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24">
+                  <circle cx="11" cy="11" r="6.5" />
+                  <path d="m16 16 4 4" />
+                </svg>
+              </span>
+              <input
+                type="text"
+                className="feed-search-input"
+                placeholder="Search Chithi"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+              <button type="submit" className="feed-search-submit" aria-label="Search">
+                Search
+              </button>
+            </form>
           </div>
 
           <CreatePostComposer onCreated={handlePostCreated} />

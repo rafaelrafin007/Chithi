@@ -32,12 +32,6 @@ const ICONS = {
       <path d="M4 20a8 8 0 0 1 16 0" />
     </svg>
   ),
-  search: (
-    <svg viewBox="0 0 24 24" aria-hidden="true">
-      <circle cx="11" cy="11" r="6.5" />
-      <path d="m16 16 4 4" />
-    </svg>
-  ),
 };
 
 export default function SocialNav({ className = "", variant = "default" }) {
@@ -60,21 +54,41 @@ export default function SocialNav({ className = "", variant = "default" }) {
       ]
     : [
         { key: "feed", label: "Feed", to: "/feed", icon: ICONS.feed },
-        { key: "search", label: "Search", to: "/search", icon: ICONS.search },
         { key: "friends", label: "Friends", to: "/friends", icon: ICONS.friends },
         { key: "notifications", label: "Notifications", to: "/notifications", icon: ICONS.notifications },
         { key: "chat", label: "Chats", to: "/chat", icon: ICONS.chat },
         { key: "profile", label: "Profile", to: profileIdentifier ? `/profile/${profileIdentifier}` : "/feed", icon: ICONS.profile },
       ];
 
+  const profileLabel = user?.display_name || user?.username || "My Profile";
+  const profileHandle = user?.username ? `@${user.username}` : "";
+  const profileAvatar = user?.avatar_url || user?.profile_picture || user?.profile_image || "";
+
   return (
     <div className={`social-nav ${iconOnly ? "icon-only" : ""} ${sidebar ? "sidebar" : ""} ${className}`.trim()}>
+      {sidebar && (
+        <button
+          type="button"
+          className="social-nav-user"
+          onClick={() => nav(profileIdentifier ? `/profile/${profileIdentifier}` : "/feed")}
+        >
+          {profileAvatar ? (
+            <img src={profileAvatar} alt={profileLabel} className="social-nav-user-avatar" />
+          ) : (
+            <div className="social-nav-user-avatar fallback">
+              {profileLabel.charAt(0).toUpperCase()}
+            </div>
+          )}
+          <div className="social-nav-user-meta">
+            <div className="social-nav-user-name">{profileLabel}</div>
+            {profileHandle && <div className="social-nav-user-handle">{profileHandle}</div>}
+          </div>
+        </button>
+      )}
       {links.map((item) => {
         const isActive =
           item.key === "feed"
             ? location.pathname.startsWith("/feed")
-            : item.key === "search"
-              ? location.pathname.startsWith("/search")
             : item.key === "notifications"
               ? location.pathname.startsWith("/notifications")
             : item.key === "chat"
