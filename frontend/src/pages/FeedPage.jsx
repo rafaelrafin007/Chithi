@@ -152,12 +152,12 @@ export default function FeedPage() {
   };
 
   return (
-    <div className="social-page">
-      <div className="social-shell with-side-nav">
+    <div className="social-page feed-page">
+      <div className="social-shell with-side-nav feed-shell">
         <aside className="social-side-panel">
           <SocialNav variant="sidebar" />
         </aside>
-        <div className="social-main">
+        <div className="social-main feed-main">
           <div className="social-top">
             <div>
               <div className="social-kicker">Chithi Social</div>
