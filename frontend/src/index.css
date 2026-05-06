@@ -1691,6 +1691,23 @@ body.dark-theme .edit-icon{color:#fff;}
   border: 1px solid rgba(255, 255, 255, 0.14);
   border-radius: 10px;
   padding: 8px 10px;
+  min-height: 42px;
+}
+
+.social-select:focus {
+  outline: none;
+  border-color: rgba(125, 158, 255, 0.7);
+  box-shadow: 0 0 0 2px rgba(96, 130, 255, 0.22);
+}
+
+.social-select option {
+  background: #1a2232;
+  color: #f5f7ff;
+}
+
+.social-select option:checked {
+  background: #2f76bb;
+  color: #ffffff;
 }
 
 .composer-controls {
@@ -2232,6 +2249,21 @@ body.light-theme .social-select {
   color: #111827;
   background: #fff;
   border-color: rgba(17, 24, 39, 0.16);
+}
+
+body.light-theme .social-select:focus {
+  border-color: rgba(52, 102, 212, 0.55);
+  box-shadow: 0 0 0 2px rgba(52, 102, 212, 0.15);
+}
+
+body.light-theme .social-select option {
+  background: #ffffff;
+  color: #111827;
+}
+
+body.light-theme .social-select option:checked {
+  background: #e8f0ff;
+  color: #111827;
 }
 
 body.light-theme .social-upload-btn {
