@@ -1,6 +1,5 @@
 // src/pages/ProfilePanel.jsx
 import React, { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 
 /**
@@ -13,8 +12,7 @@ import { useAuth } from "../context/AuthContext";
  * - when editing, shows input/textarea + Save / Cancel for that field only
  */
 export default function ProfilePanel({ onClose }) {
-  const { user, updateProfile, logout } = useAuth();
-  const navigate = useNavigate();
+  const { user, updateProfile } = useAuth();
   const profile = user?.profile || {};
 
   // local copies
@@ -288,15 +286,6 @@ export default function ProfilePanel({ onClose }) {
 
       {/* close button at bottom (optional) */}
       <div className="profile-close-row">
-        <button
-          className="btn btn-secondary"
-          onClick={() => {
-            logout();
-            navigate("/login", { replace: true });
-          }}
-        >
-          Logout
-        </button>
         {onClose && (
           <button className="btn btn-secondary" onClick={onClose}>
             Close
