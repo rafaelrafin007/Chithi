@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { blockUser, getProfilePosts, getSocialProfile, reportUser, unblockUser } from "../services/api";
 import SocialNav from "../components/SocialNav";
@@ -18,7 +18,9 @@ function normalizePaged(payload) {
 
 export default function ProfilePage() {
   const { identifier } = useParams();
+  const nav = useNavigate();
   const { user } = useAuth();
+  const [searchQuery, setSearchQuery] = useState("");
 
   const [profile, setProfile] = useState(null);
   const [posts, setPosts] = useState([]);
@@ -240,18 +242,46 @@ export default function ProfilePage() {
     }
   };
 
+  const handleSearchSubmit = (event) => {
+    event.preventDefault();
+    const query = searchQuery.trim();
+    if (!query) {
+      nav("/search");
+      return;
+    }
+    nav(`/search?q=${encodeURIComponent(query)}`);
+  };
+
   return (
     <div className="social-page">
-      <div className="social-shell with-side-nav">
+      <div className="social-shell with-side-nav feed-shell">
         <aside className="social-side-panel">
           <SocialNav variant="sidebar" />
         </aside>
-        <div className="social-main">
+        <div className="social-main feed-main">
           <div className="social-top">
             <div>
               <div className="social-kicker">Chithi Social</div>
               <h2>Profile</h2>
             </div>
+            <form className="feed-search-form feed-header-search" onSubmit={handleSearchSubmit}>
+              <span className="feed-search-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24">
+                  <circle cx="11" cy="11" r="6.5" />
+                  <path d="m16 16 4 4" />
+                </svg>
+              </span>
+              <input
+                type="text"
+                className="feed-search-input"
+                placeholder="Search Chithi"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+              <button type="submit" className="feed-search-submit" aria-label="Search">
+                Search
+              </button>
+            </form>
           </div>
 
           {loadingProfile ? (
