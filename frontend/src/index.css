@@ -2298,6 +2298,9 @@ body.light-theme .feed-search-input::placeholder {
 
 .feed-main .feed-header-search {
   width: min(500px, 48vw);
+  position: relative;
+  left: 100px;
+  top: 50px;
 }
 
 .feed-main > .social-card,
@@ -2350,6 +2353,9 @@ body.light-theme .feed-search-input::placeholder {
   }
   .feed-main .feed-header-search {
     width: 100%;
+    position: static;
+    left: auto;
+    top: auto;
   }
   .feed-main > .social-card,
   .feed-main > .social-list,
