@@ -127,6 +127,17 @@ export default function NotificationPage() {
     }
   };
 
+  const handleNotificationOpen = async (item, destination, event) => {
+    event?.preventDefault?.();
+    event?.stopPropagation?.();
+    if (!destination) return;
+
+    if (!item.is_read) {
+      await handleMarkOne(item.id);
+    }
+    nav(destination);
+  };
+
   const handleMarkAll = async () => {
     if (!unreadCount || markingAll) return;
     setMarkingAll(true);
@@ -224,12 +235,24 @@ export default function NotificationPage() {
               {items.map((item) => {
                 const destination = notificationDestination(item);
                 return (
-                  <article key={item.id} className={`social-card notification-card ${item.is_read ? "read" : "unread"}`}>
+                  <article
+                    key={item.id}
+                    className={`social-card notification-card ${item.is_read ? "read" : "unread"}`}
+                    onClick={(event) => handleNotificationOpen(item, destination, event)}
+                    role={destination ? "button" : undefined}
+                    tabIndex={destination ? 0 : undefined}
+                    onKeyDown={(event) => {
+                      if (!destination) return;
+                      if (event.key === "Enter" || event.key === " ") {
+                        handleNotificationOpen(item, destination, event);
+                      }
+                    }}
+                  >
                   <div className="notification-main">
                     <button
                       type="button"
                       className="notification-actor-link"
-                      onClick={() => destination && nav(destination)}
+                      onClick={(event) => handleNotificationOpen(item, destination, event)}
                       disabled={!destination}
                     >
                       {item.actor?.avatar_url ? (
@@ -247,12 +270,24 @@ export default function NotificationPage() {
                   </div>
                   <div className="notification-actions">
                     {!item.is_read && (
-                      <button type="button" className="social-link-btn" onClick={() => handleMarkOne(item.id)}>
+                      <button
+                        type="button"
+                        className="social-link-btn"
+                        onClick={(event) => {
+                          event.preventDefault();
+                          event.stopPropagation();
+                          handleMarkOne(item.id);
+                        }}
+                      >
                         Mark read
                       </button>
                     )}
                     {item.target_post_id && (
-                      <button type="button" className="social-link-btn" onClick={() => nav(`/post/${item.target_post_id}`)}>
+                      <button
+                        type="button"
+                        className="social-link-btn"
+                        onClick={(event) => handleNotificationOpen(item, `/post/${item.target_post_id}`, event)}
+                      >
                         Open post
                       </button>
                     )}
@@ -260,7 +295,9 @@ export default function NotificationPage() {
                       <button
                         type="button"
                         className="social-link-btn"
-                        onClick={() => nav(`/profile/${item.actor.username || item.actor.id}`)}
+                        onClick={(event) =>
+                          handleNotificationOpen(item, `/profile/${item.actor.username || item.actor.id}`, event)
+                        }
                       >
                         Open profile
                       </button>
