@@ -14,6 +14,12 @@ DEBUG = config("DJANGO_DEBUG", default=True, cast=bool)
 
 # For local dev with websockets from React
 ALLOWED_HOSTS = config("DJANGO_ALLOWED_HOSTS", default="127.0.0.1,localhost", cast=Csv())
+CORS_ALLOWED_ORIGINS = config(
+    "DJANGO_CORS_ALLOWED_ORIGINS",
+    default="http://localhost:3000,http://127.0.0.1:3000",
+    cast=Csv(),
+)
+CSRF_TRUSTED_ORIGINS = config("DJANGO_CSRF_TRUSTED_ORIGINS", default="", cast=Csv())
 REDIS_URL = config("REDIS_URL", default="")
 
 CLOUDINARY_CLOUD_NAME = config("CLOUDINARY_CLOUD_NAME", default="")
@@ -121,6 +127,14 @@ else:
 # Static files (existing)
 STATIC_URL = 'static/'
 STATIC_ROOT = BASE_DIR / "staticfiles"
+STORAGES = {
+    "default": {
+        "BACKEND": "django.core.files.storage.FileSystemStorage",
+    },
+    "staticfiles": {
+        "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
+    },
+}
 
 # Media (uploads)
 MEDIA_URL = "/media/"
@@ -132,13 +146,8 @@ if CLOUDINARY_ENABLED:
         "API_KEY": CLOUDINARY_API_KEY,
         "API_SECRET": CLOUDINARY_API_SECRET,
     }
-    STORAGES = {
-        "default": {
-            "BACKEND": "cloudinary_storage.storage.MediaCloudinaryStorage",
-        },
-        "staticfiles": {
-            "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage",
-        },
+    STORAGES["default"] = {
+        "BACKEND": "cloudinary_storage.storage.MediaCloudinaryStorage",
     }
 
 AUTH_PASSWORD_VALIDATORS = [
@@ -159,11 +168,6 @@ SIMPLE_JWT = {
     "ACCESS_TOKEN_LIFETIME": timedelta(minutes=60),
     "REFRESH_TOKEN_LIFETIME": timedelta(days=7),
 }
-
-CORS_ALLOWED_ORIGINS = [
-    "http://localhost:3000",
-    "http://127.0.0.1:3000",
-]
 
 LANGUAGE_CODE = 'en-us'
 TIME_ZONE = 'UTC'
