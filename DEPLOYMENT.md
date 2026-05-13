@@ -14,6 +14,22 @@ Start command:
 daphne backend.asgi:application --bind 0.0.0.0 --port $PORT
 ```
 
+## Vercel frontend environment variables
+
+Set these in the Vercel project settings for production:
+
+```env
+REACT_APP_API_BASE_URL=https://chithi-backend-sghy.onrender.com
+REACT_APP_WS_BASE_URL=wss://chithi-backend-sghy.onrender.com
+```
+
+Local frontend development can omit both variables. The React app falls back to:
+
+```env
+REACT_APP_API_BASE_URL=http://localhost:8000
+REACT_APP_WS_BASE_URL=ws://localhost:8000
+```
+
 ## Required Render environment variables
 
 ```env

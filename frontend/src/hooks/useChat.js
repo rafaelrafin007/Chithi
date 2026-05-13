@@ -2,7 +2,7 @@
 import { useEffect, useState, useRef, useCallback } from "react";
 import api, {
   sendMessage,
-  getApiBaseUrl,
+  getWsBaseUrl,
   getUsers,
   getConversation,
   archiveConversation,
@@ -405,10 +405,7 @@ export default function useChat(user, options = {}) {
         const wsToken = resp.data?.ws_token;
         if (!wsToken || cancelled) return;
 
-        const apiBase = getApiBaseUrl();
-        const wsScheme = apiBase.startsWith("https://") ? "wss" : "ws";
-        const wsHost = apiBase.replace(/^https?:\/\//, "");
-        const url = `${wsScheme}://${wsHost}/ws/chat/${selected.id}/?ws_token=${encodeURIComponent(wsToken)}`;
+        const url = `${getWsBaseUrl()}/ws/chat/${selected.id}/?ws_token=${encodeURIComponent(wsToken)}`;
 
         const ws = new WebSocket(url);
         wsRef.current = ws;

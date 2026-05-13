@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import api, { getApiBaseUrl } from "../services/api";
+import api, { getWsBaseUrl } from "../services/api";
 
 export const SOCIAL_REALTIME_EVENT_NAME = "chithi:social-realtime";
 
@@ -22,10 +22,7 @@ export default function useSocialRealtime(onEvent, enabled = true) {
         const wsToken = tokenResp?.data?.ws_token;
         if (!wsToken || cancelled) return;
 
-        const base = getApiBaseUrl();
-        const scheme = base.startsWith("https://") ? "wss" : "ws";
-        const host = base.replace(/^https?:\/\//, "");
-        socket = new WebSocket(`${scheme}://${host}/ws/social/?ws_token=${encodeURIComponent(wsToken)}`);
+        socket = new WebSocket(`${getWsBaseUrl()}/ws/social/?ws_token=${encodeURIComponent(wsToken)}`);
 
         socket.onmessage = (evt) => {
           try {

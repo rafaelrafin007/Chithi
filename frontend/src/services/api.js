@@ -1,14 +1,19 @@
 // src/services/api.js
 import axios from "axios";
 
-const DEFAULT_API_BASE = "http://127.0.0.1:8000";
-const apiBaseUrl = (process.env.REACT_APP_API_BASE_URL || DEFAULT_API_BASE).replace(/\/+$/, "");
+const DEFAULT_API_BASE = "http://localhost:8000";
+const DEFAULT_WS_BASE = "ws://localhost:8000";
+const stripTrailingSlashes = (value) => value.replace(/\/+$/, "");
+
+const apiBaseUrl = stripTrailingSlashes(process.env.REACT_APP_API_BASE_URL || DEFAULT_API_BASE);
+const wsBaseUrl = stripTrailingSlashes(process.env.REACT_APP_WS_BASE_URL || DEFAULT_WS_BASE);
 
 const api = axios.create({
   baseURL: apiBaseUrl,
 });
 
 export const getApiBaseUrl = () => apiBaseUrl;
+export const getWsBaseUrl = () => wsBaseUrl;
 
 // Attach JWT token
 api.interceptors.request.use((config) => {
