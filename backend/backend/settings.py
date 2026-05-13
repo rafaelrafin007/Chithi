@@ -14,6 +14,7 @@ DEBUG = config("DJANGO_DEBUG", default=True, cast=bool)
 
 # For local dev with websockets from React
 ALLOWED_HOSTS = config("DJANGO_ALLOWED_HOSTS", default="127.0.0.1,localhost", cast=Csv())
+REDIS_URL = config("REDIS_URL", default="")
 
 CLOUDINARY_CLOUD_NAME = config("CLOUDINARY_CLOUD_NAME", default="")
 CLOUDINARY_API_KEY = config("CLOUDINARY_API_KEY", default="")
@@ -76,13 +77,24 @@ TEMPLATES = [
 # --- Channels / ASGI ---
 ASGI_APPLICATION = 'backend.asgi.application'  # <-- ADD
 
-# In-memory channel layer for dev (no Redis requirement).
-# For prod, switch to RedisChannelLayer.
-CHANNEL_LAYERS = {
-    "default": {
-        "BACKEND": "channels.layers.InMemoryChannelLayer", # Dev only; replace with Redis in production
+# WebSocket channel layer:
+# - local/dev: in-memory layer when REDIS_URL is unset
+# - production: Redis layer when REDIS_URL is set
+if REDIS_URL:
+    CHANNEL_LAYERS = {
+        "default": {
+            "BACKEND": "channels_redis.core.RedisChannelLayer",
+            "CONFIG": {
+                "hosts": [REDIS_URL],
+            },
+        }
     }
-}
+else:
+    CHANNEL_LAYERS = {
+        "default": {
+            "BACKEND": "channels.layers.InMemoryChannelLayer",
+        }
+    }
 
 # WSGI is still fine for classic HTTP (runserver wires ASGI automatically in Django 5)
 WSGI_APPLICATION = 'backend.wsgi.application'
