@@ -1,7 +1,7 @@
 import logging
 from urllib.parse import parse_qs
 
-from channels.db import database_sync_to_async
+from channels.db import aclose_old_connections, database_sync_to_async
 from channels.generic.websocket import AsyncJsonWebsocketConsumer
 
 logger = logging.getLogger(__name__)
@@ -15,6 +15,7 @@ def social_user_group(user_id):
 
 class SocialConsumer(AsyncJsonWebsocketConsumer):
     async def connect(self):
+        await aclose_old_connections()
         self.user = await self._authenticate_from_querystring()
         if not self.user or not self.user.is_authenticated:
             await self.close(code=4401)
@@ -32,6 +33,7 @@ class SocialConsumer(AsyncJsonWebsocketConsumer):
         await self.channel_layer.group_discard(SOCIAL_GLOBAL_GROUP, self.channel_name)
 
     async def receive_json(self, content, **kwargs):
+        await aclose_old_connections()
         # Keep consumer one-way for now; realtime sync is server -> client.
         return
 

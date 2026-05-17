@@ -40,11 +40,17 @@ DJANGO_CORS_ALLOWED_ORIGINS=https://your-frontend-domain.com
 DJANGO_CSRF_TRUSTED_ORIGINS=https://your-render-service.onrender.com,https://your-frontend-domain.com
 DATABASE_URL=postgres://USER:PASSWORD@HOST:5432/DBNAME
 DATABASE_SSL_REQUIRE=True
+DJANGO_DB_CONN_MAX_AGE=0
+DJANGO_DB_CONN_HEALTH_CHECKS=False
 REDIS_URL=rediss://default:password@host:port
 CLOUDINARY_CLOUD_NAME=your-cloud-name
 CLOUDINARY_API_KEY=your-api-key
 CLOUDINARY_API_SECRET=your-api-secret
+WEB_CONCURRENCY=1
+ASGI_THREADS=2
 ```
+
+For Supabase transaction pooler URLs, keep `DJANGO_DB_CONN_MAX_AGE=0` so Django does not hold persistent database connections in long-lived ASGI workers.
 
 ## One-time production commands
 
@@ -67,3 +73,4 @@ When production variables are not set:
 - database falls back to `backend/db.sqlite3`
 - media falls back to local `MEDIA_ROOT` / `MEDIA_URL`
 - Channels falls back to the in-memory channel layer
+- database connection lifetime defaults to non-persistent connections

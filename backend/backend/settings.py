@@ -21,6 +21,8 @@ CORS_ALLOWED_ORIGINS = config(
 )
 CSRF_TRUSTED_ORIGINS = config("DJANGO_CSRF_TRUSTED_ORIGINS", default="", cast=Csv())
 REDIS_URL = config("REDIS_URL", default="")
+DB_CONN_MAX_AGE = config("DJANGO_DB_CONN_MAX_AGE", default=0, cast=int)
+DB_CONN_HEALTH_CHECKS = config("DJANGO_DB_CONN_HEALTH_CHECKS", default=False, cast=bool)
 
 CLOUDINARY_CLOUD_NAME = config("CLOUDINARY_CLOUD_NAME", default="")
 CLOUDINARY_API_KEY = config("CLOUDINARY_API_KEY", default="")
@@ -112,7 +114,8 @@ if DATABASE_URL:
     DATABASES = {
         "default": dj_database_url.parse(
             DATABASE_URL,
-            conn_max_age=600,
+            conn_max_age=DB_CONN_MAX_AGE,
+            conn_health_checks=DB_CONN_HEALTH_CHECKS,
             ssl_require=config("DATABASE_SSL_REQUIRE", default=not DEBUG, cast=bool),
         )
     }

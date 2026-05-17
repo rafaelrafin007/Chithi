@@ -9,7 +9,7 @@ from django.db.models import Q
 from django.db.utils import OperationalError, ProgrammingError
 
 from channels.generic.websocket import AsyncJsonWebsocketConsumer
-from channels.db import database_sync_to_async
+from channels.db import aclose_old_connections, database_sync_to_async
 
 logger = logging.getLogger(__name__)
 
@@ -36,6 +36,7 @@ class ChatConsumer(AsyncJsonWebsocketConsumer):
     """
 
     async def connect(self):
+        await aclose_old_connections()
         self.user = await self._authenticate_from_querystring()
         if not self.user or not self.user.is_authenticated:
             logger.warning("WebSocket auth failed during connect")
@@ -68,13 +69,14 @@ class ChatConsumer(AsyncJsonWebsocketConsumer):
         await self.send_json({"type": "presence_sync", "users": online_list})
 
     async def disconnect(self, code):
+        await aclose_old_connections()
         if hasattr(self, "room_group_name"):
             await self.channel_layer.group_discard(self.room_group_name, self.channel_name)
         if hasattr(self, "user_group_name"):
             await self.channel_layer.group_discard(self.user_group_name, self.channel_name)
         await self.channel_layer.group_discard("presence", self.channel_name)
 
-        if self.user and self.user.is_authenticated:
+        if getattr(self, "user", None) and self.user.is_authenticated:
             async with ONLINE_LOCK:
                 ONLINE_USERS.discard(self.user.id)
             await self.channel_layer.group_send(
@@ -84,6 +86,7 @@ class ChatConsumer(AsyncJsonWebsocketConsumer):
             await self._update_last_seen(self.user)
 
     async def receive_json(self, content, **kwargs):
+        await aclose_old_connections()
         if not self.user or not self.user.is_authenticated:
             return
 
