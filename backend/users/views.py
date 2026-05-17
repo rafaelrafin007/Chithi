@@ -13,7 +13,8 @@ from asgiref.sync import async_to_sync
 from channels.layers import get_channel_layer
 
 from .serializers import RegisterSerializer, UserProfileSerializer, ProfileSerializer, UserSimpleSerializer, FriendRequestSerializer
-from .models import Profile, FriendRequest, Follow, Block, is_blocked_between
+from .models import Profile, FriendRequest, Follow, Block, Notification, is_blocked_between
+from .notifications import create_notification_if_applicable
 
 User = get_user_model()
 
@@ -174,9 +175,21 @@ class FriendRequestsView(APIView):
                 # Accept incoming request automatically if user sends back
                 existing.status = FriendRequest.STATUS_ACCEPTED
                 existing.save(update_fields=["status", "updated_at"])
+                create_notification_if_applicable(
+                    recipient=existing.from_user,
+                    actor=request.user,
+                    notification_type=Notification.TYPE_FRIEND_ACCEPTED,
+                    dedupe=True,
+                )
                 return Response(FriendRequestSerializer(existing, context={"request": request}).data, status=200)
 
         fr = FriendRequest.objects.create(from_user=request.user, to_user=to_user)
+        create_notification_if_applicable(
+            recipient=to_user,
+            actor=request.user,
+            notification_type=Notification.TYPE_FRIEND_REQUEST,
+            dedupe=True,
+        )
         try:
             channel_layer = get_channel_layer()
             async_to_sync(channel_layer.group_send)(
@@ -203,6 +216,13 @@ class FriendRequestRespondView(APIView):
 
         fr.status = FriendRequest.STATUS_ACCEPTED if action == "accept" else FriendRequest.STATUS_DECLINED
         fr.save(update_fields=["status", "updated_at"])
+        if action == "accept":
+            create_notification_if_applicable(
+                recipient=fr.from_user,
+                actor=request.user,
+                notification_type=Notification.TYPE_FRIEND_ACCEPTED,
+                dedupe=True,
+            )
         return Response(FriendRequestSerializer(fr, context={"request": request}).data, status=200)
 
 

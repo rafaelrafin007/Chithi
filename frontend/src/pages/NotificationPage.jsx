@@ -26,6 +26,9 @@ function formatTime(timestamp) {
 function buildMessage(notification) {
   const actor = notification?.actor?.display_name || notification?.actor?.username || "Someone";
   if (notification.type === "follow") return `${actor} followed you`;
+  if (notification.type === "new_post") return `${actor} shared a new post`;
+  if (notification.type === "friend_request") return `${actor} sent you a friend request`;
+  if (notification.type === "friend_accepted") return `${actor} accepted your friend request`;
   if (notification.type === "post_like") return `${actor} liked your post`;
   if (notification.type === "post_comment") return `${actor} commented on your post`;
   return `${actor} sent an update`;
@@ -36,7 +39,13 @@ function notificationDestination(notification) {
   if (notification?.type === "follow") {
     return actorIdentifier ? `/profile/${actorIdentifier}` : null;
   }
-  if (notification?.type === "post_like" || notification?.type === "post_comment") {
+  if (notification?.type === "friend_request") {
+    return "/friends";
+  }
+  if (notification?.type === "friend_accepted") {
+    return actorIdentifier ? `/profile/${actorIdentifier}` : "/friends";
+  }
+  if (notification?.type === "new_post" || notification?.type === "post_like" || notification?.type === "post_comment") {
     if (notification?.target_post_id) {
       return `/post/${notification.target_post_id}`;
     }
@@ -291,7 +300,16 @@ export default function NotificationPage() {
                         Open post
                       </button>
                     )}
-                    {!item.target_post_id && item.type === "follow" && item.actor && (
+                    {!item.target_post_id && item.type === "friend_request" && (
+                      <button
+                        type="button"
+                        className="social-link-btn"
+                        onClick={(event) => handleNotificationOpen(item, "/friends", event)}
+                      >
+                        Open friends
+                      </button>
+                    )}
+                    {!item.target_post_id && ["follow", "friend_accepted"].includes(item.type) && item.actor && (
                       <button
                         type="button"
                         className="social-link-btn"

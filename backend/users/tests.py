@@ -373,6 +373,7 @@ class SocialNotificationAndSafetyTests(APITestCase):
         self.alice = User.objects.create_user(username="alice_ns", password="pass12345")
         self.bob = User.objects.create_user(username="bob_ns", password="pass12345")
         self.charlie = User.objects.create_user(username="charlie_ns", password="pass12345")
+        self.dana = User.objects.create_user(username="dana_ns", password="pass12345")
 
     def _auth(self, user):
         self.client.force_authenticate(user=user)
@@ -390,6 +391,114 @@ class SocialNotificationAndSafetyTests(APITestCase):
         notif = Notification.objects.filter(recipient=self.alice, actor=self.bob, type=Notification.TYPE_FOLLOW).first()
         self.assertIsNotNone(notif)
 
+    def test_public_new_post_notifies_friends_and_followers_only(self):
+        Follow.objects.create(follower=self.bob, following=self.alice)
+        FriendRequest.objects.create(
+            from_user=self.alice,
+            to_user=self.charlie,
+            status=FriendRequest.STATUS_ACCEPTED,
+        )
+
+        self._auth(self.alice)
+        response = self.client.post(
+            "/api/social/feed/",
+            {"content": "Public launch note", "visibility": Post.VISIBILITY_PUBLIC},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+        notifications = Notification.objects.filter(type=Notification.TYPE_NEW_POST)
+        self.assertEqual(set(notifications.values_list("recipient_id", flat=True)), {self.bob.id, self.charlie.id})
+        self.assertTrue(notifications.filter(target_post_id=response.data["id"]).exists())
+        self.assertFalse(notifications.filter(recipient=self.alice).exists())
+        self.assertFalse(notifications.filter(recipient=self.dana).exists())
+
+    def test_followers_only_new_post_notifies_followers_only(self):
+        Follow.objects.create(follower=self.bob, following=self.alice)
+        FriendRequest.objects.create(
+            from_user=self.alice,
+            to_user=self.charlie,
+            status=FriendRequest.STATUS_ACCEPTED,
+        )
+
+        self._auth(self.alice)
+        response = self.client.post(
+            "/api/social/feed/",
+            {"content": "Followers only note", "visibility": Post.VISIBILITY_FOLLOWERS_ONLY},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+        notifications = Notification.objects.filter(type=Notification.TYPE_NEW_POST)
+        self.assertEqual(set(notifications.values_list("recipient_id", flat=True)), {self.bob.id})
+
+    def test_private_post_creates_no_notification(self):
+        Follow.objects.create(follower=self.bob, following=self.alice)
+        FriendRequest.objects.create(
+            from_user=self.alice,
+            to_user=self.charlie,
+            status=FriendRequest.STATUS_ACCEPTED,
+        )
+
+        self._auth(self.alice)
+        response = self.client.post(
+            "/api/social/feed/",
+            {"content": "Private note", "visibility": Post.VISIBILITY_PRIVATE},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertFalse(Notification.objects.filter(type=Notification.TYPE_NEW_POST).exists())
+
+    def test_new_post_does_not_notify_blocked_users(self):
+        Follow.objects.create(follower=self.bob, following=self.alice)
+        FriendRequest.objects.create(
+            from_user=self.alice,
+            to_user=self.charlie,
+            status=FriendRequest.STATUS_ACCEPTED,
+        )
+        Block.objects.create(blocker=self.alice, blocked=self.bob)
+        Block.objects.create(blocker=self.charlie, blocked=self.alice)
+
+        self._auth(self.alice)
+        response = self.client.post(
+            "/api/social/feed/",
+            {"content": "Blocked users should not hear about this", "visibility": Post.VISIBILITY_PUBLIC},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertFalse(Notification.objects.filter(type=Notification.TYPE_NEW_POST).exists())
+
+    def test_friend_request_creates_notification(self):
+        self._auth(self.bob)
+        response = self.client.post(
+            "/api/auth/friend-requests/",
+            {"to_user_id": self.alice.id},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        notif = Notification.objects.filter(
+            recipient=self.alice,
+            actor=self.bob,
+            type=Notification.TYPE_FRIEND_REQUEST,
+        ).first()
+        self.assertIsNotNone(notif)
+
+    def test_friend_request_accepted_creates_notification(self):
+        request_obj = FriendRequest.objects.create(from_user=self.bob, to_user=self.alice)
+        self._auth(self.alice)
+        response = self.client.post(
+            f"/api/auth/friend-requests/{request_obj.id}/respond/",
+            {"action": "accept"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        notif = Notification.objects.filter(
+            recipient=self.bob,
+            actor=self.alice,
+            type=Notification.TYPE_FRIEND_ACCEPTED,
+        ).first()
+        self.assertIsNotNone(notif)
+
     def test_like_creates_notification(self):
         post = Post.objects.create(author=self.alice, content="Like me", visibility=Post.VISIBILITY_PUBLIC)
         self._auth(self.bob)
@@ -402,6 +511,25 @@ class SocialNotificationAndSafetyTests(APITestCase):
             target_post=post,
         ).first()
         self.assertIsNotNone(notif)
+
+    def test_like_notification_is_not_duplicated_after_relike(self):
+        post = Post.objects.create(author=self.alice, content="Relike me", visibility=Post.VISIBILITY_PUBLIC)
+        self._auth(self.bob)
+        first_like = self.client.post(f"/api/social/posts/{post.id}/like/", {}, format="json")
+        unlike = self.client.post(f"/api/social/posts/{post.id}/unlike/", {}, format="json")
+        second_like = self.client.post(f"/api/social/posts/{post.id}/like/", {}, format="json")
+        self.assertEqual(first_like.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(unlike.status_code, status.HTTP_200_OK)
+        self.assertEqual(second_like.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(
+            Notification.objects.filter(
+                recipient=self.alice,
+                actor=self.bob,
+                type=Notification.TYPE_POST_LIKE,
+                target_post=post,
+            ).count(),
+            1,
+        )
 
     def test_comment_creates_notification(self):
         post = Post.objects.create(author=self.alice, content="Comment me", visibility=Post.VISIBILITY_PUBLIC)
@@ -425,6 +553,18 @@ class SocialNotificationAndSafetyTests(APITestCase):
         self._auth(self.alice)
         response = self.client.post(f"/api/social/posts/{post.id}/like/", {}, format="json")
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        comment_response = self.client.post(
+            f"/api/social/posts/{post.id}/comments/",
+            {"content": "Commenting on my own post"},
+            format="json",
+        )
+        self.assertEqual(comment_response.status_code, status.HTTP_201_CREATED)
+        post_response = self.client.post(
+            "/api/social/feed/",
+            {"content": "No self notification", "visibility": Post.VISIBILITY_PUBLIC},
+            format="json",
+        )
+        self.assertEqual(post_response.status_code, status.HTTP_201_CREATED)
         self.assertFalse(Notification.objects.filter(recipient=self.alice).exists())
 
     def test_block_prevents_follow(self):
@@ -532,6 +672,36 @@ class SocialNotificationAndSafetyTests(APITestCase):
         )
         self.assertEqual(comment_response.status_code, status.HTTP_201_CREATED)
         self.assertEqual(self._unread_count(self.alice), 3)
+
+    def test_new_notification_types_update_unread_count(self):
+        Follow.objects.create(follower=self.bob, following=self.alice)
+        self._auth(self.alice)
+        post_response = self.client.post(
+            "/api/social/feed/",
+            {"content": "Count this new post", "visibility": Post.VISIBILITY_PUBLIC},
+            format="json",
+        )
+        self.assertEqual(post_response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(self._unread_count(self.bob), 1)
+
+        self._auth(self.charlie)
+        friend_response = self.client.post(
+            "/api/auth/friend-requests/",
+            {"to_user_id": self.alice.id},
+            format="json",
+        )
+        self.assertEqual(friend_response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(self._unread_count(self.alice), 1)
+
+        request_id = friend_response.data["id"]
+        self._auth(self.alice)
+        accept_response = self.client.post(
+            f"/api/auth/friend-requests/{request_id}/respond/",
+            {"action": "accept"},
+            format="json",
+        )
+        self.assertEqual(accept_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(self._unread_count(self.charlie), 1)
 
     def test_users_directory_includes_block_state_flags(self):
         Block.objects.create(blocker=self.alice, blocked=self.bob)

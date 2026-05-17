@@ -230,11 +230,17 @@ class Comment(models.Model):
 
 class Notification(models.Model):
     TYPE_FOLLOW = "follow"
+    TYPE_NEW_POST = "new_post"
+    TYPE_FRIEND_REQUEST = "friend_request"
+    TYPE_FRIEND_ACCEPTED = "friend_accepted"
     TYPE_POST_LIKE = "post_like"
     TYPE_POST_COMMENT = "post_comment"
 
     TYPE_CHOICES = [
         (TYPE_FOLLOW, "Follow"),
+        (TYPE_NEW_POST, "New Post"),
+        (TYPE_FRIEND_REQUEST, "Friend Request"),
+        (TYPE_FRIEND_ACCEPTED, "Friend Accepted"),
         (TYPE_POST_LIKE, "Post Like"),
         (TYPE_POST_COMMENT, "Post Comment"),
     ]

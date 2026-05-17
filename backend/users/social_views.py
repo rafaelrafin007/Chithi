@@ -9,6 +9,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from .models import Block, Follow, Post, PostMedia, PostLike, Comment, Notification, Report, is_blocked_between
+from .notifications import create_new_post_notifications, create_notification_if_applicable
 from .pagination import StandardPagination
 from .permissions import IsPostOwnerOrReadOnly, IsCommentOwnerOrReadOnly
 from .serializers import UserSimpleSerializer
@@ -60,30 +61,6 @@ def _annotated_posts_queryset(user, queryset):
 
 def _is_blocked_between_users(user_a, user_b):
     return is_blocked_between(user_a, user_b)
-
-
-def _create_notification_if_applicable(recipient, actor, notification_type, target_post=None, target_comment=None):
-    if not recipient or not actor:
-        return
-    if recipient.id == actor.id:
-        return
-    notification = Notification.objects.create(
-        recipient=recipient,
-        actor=actor,
-        type=notification_type,
-        target_post=target_post,
-        target_comment=target_comment,
-    )
-    payload = NotificationReadSerializer(notification, context={}).data
-    unread_count = Notification.objects.filter(recipient=recipient, is_read=False).count()
-    broadcast_notification_event(
-        recipient.id,
-        {
-            "event": "notification_created",
-            "notification": payload,
-            "unread_count": unread_count,
-        },
-    )
 
 
 def _visible_posts_queryset_for_user(user):
@@ -212,10 +189,11 @@ class FollowUserView(APIView):
             return Response({"detail": exc.message_dict if hasattr(exc, "message_dict") else str(exc)}, status=400)
         except IntegrityError:
             return Response({"detail": "You already follow this user."}, status=400)
-        _create_notification_if_applicable(
+        create_notification_if_applicable(
             recipient=target,
             actor=request.user,
             notification_type=Notification.TYPE_FOLLOW,
+            dedupe=True,
         )
         return Response({"detail": "Followed successfully."}, status=201)
 
@@ -308,9 +286,10 @@ class FeedView(APIView):
 
         post = _annotated_posts_queryset(request.user, Post.objects.filter(pk=post.pk)).first()
         data = PostReadSerializer(post, context={"request": request}).data
+        create_new_post_notifications(post)
 
-        transaction.on_commit(
-            lambda: broadcast_event_for_post(
+        def _after_post_create():
+            broadcast_event_for_post(
                 post,
                 {
                     "event": "post_created",
@@ -319,7 +298,8 @@ class FeedView(APIView):
                     "post": serialize_post_for_realtime(post, request=request),
                 },
             )
-        )
+
+        transaction.on_commit(_after_post_create)
         return Response(data, status=201)
 
 
@@ -432,11 +412,12 @@ class LikePostView(APIView):
             )
 
         transaction.on_commit(_after_like)
-        _create_notification_if_applicable(
+        create_notification_if_applicable(
             recipient=post.author,
             actor=request.user,
             notification_type=Notification.TYPE_POST_LIKE,
             target_post=post,
+            dedupe=True,
         )
         return Response({"detail": "Post liked."}, status=201)
 
@@ -507,7 +488,7 @@ class CommentListCreateView(APIView):
             )
 
         transaction.on_commit(_after_comment_create)
-        _create_notification_if_applicable(
+        create_notification_if_applicable(
             recipient=post.author,
             actor=request.user,
             notification_type=Notification.TYPE_POST_COMMENT,
